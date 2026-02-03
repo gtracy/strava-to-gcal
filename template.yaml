@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  strava-to-gcal
+  Serverless backend for syncing Strava activities to Google Calendar.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: nodejs22.x
+    Environment:
+      Variables:
+        GOOGLE_CALENDAR_ID: !Ref GoogleCalendarId
+        LOG_LEVEL: info
+
+  HttpApi:
+    CorsConfiguration:
+      AllowOrigins:
+        - "*"
+      AllowHeaders:
+        - "*"
+      AllowMethods:
+        - "*"
+
+Parameters:
+  GoogleCalendarId:
+    Type: String
+    Description: The ID of the Google Calendar to sync to.
+    Default: 'primary'
+  StravaClientId:
+    Type: String
+    Description: Strava Client ID
+  StravaClientSecret:
+    Type: String
+    Description: Strava Client Secret
+  StravaRefreshToken:
+    Type: String
+    Description: Strava Refresh Token
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth Client ID
+  GoogleClientSecret:
+    Type: String
+    Description: Google OAuth Client Secret
+
+Resources:
+  StravaSyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/app.handler
+      Architectures:
+        - x86_64
+      Events:
+        WebhookGet:
+          Type: HttpApi
+          Properties:
+            Path: /webhook
+            Method: get
+        WebhookPost:
+          Type: HttpApi
+          Properties:
+            Path: /webhook
+            Method: post
+        AuthGoogle:
+          Type: HttpApi
+          Properties:
+            Path: /auth/google
+            Method: post
+        AuthStrava:
+          Type: HttpApi
+          Properties:
+            Path: /auth/strava
+            Method: post
+        UserStatus:
+          Type: HttpApi
+          Properties:
+            Path: /user/status
+            Method: get
+        UserCalendars:
+          Type: HttpApi
+          Properties:
+            Path: /user/calendars
+            Method: get
+        UserPatch:
+          Type: HttpApi
+          Properties:
+            Path: /user
+            Method: patch
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Environment:
+        Variables:
+          STRAVA_CLIENT_ID: !Ref StravaClientId
+          STRAVA_CLIENT_SECRET: !Ref StravaClientSecret
+          STRAVA_REFRESH_TOKEN: !Ref StravaRefreshToken
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+          USERS_TABLE_NAME: !Ref UsersTable
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: googleUserId
+          AttributeType: S
+        - AttributeName: stravaAthleteId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: googleUserId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StravaAthleteIndex
+          KeySchema:
+            - AttributeName: stravaAthleteId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Join ["", [!GetAtt FrontendBucket.Arn, "/*"]]
+
+Outputs:
+  WebhookApi:
+    Description: "API Gateway endpoint URL for Prod stage for Strava Sync function"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/webhook"
+  StravaSyncFunction:
+    Description: "Strava Sync Lambda Function ARN"
+    Value: !GetAtt StravaSyncFunction.Arn
+  FrontendUrl:
+    Description: "URL for the frontend SPA"
+    Value: !GetAtt FrontendBucket.WebsiteURL

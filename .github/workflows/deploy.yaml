@@ -1,0 +1,49 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - run: npm ci
+      
+      # Build the application
+      - run: sam build
+
+      # Deploy
+      - run: |
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
+            --stack-name strava-to-gcal-prod \
+            --capabilities CAPABILITY_IAM \
+            --region us-east-2 \
+            --parameter-overrides \
+              StravaClientId=${{ secrets.STRAVA_CLIENT_ID }} \
+              StravaClientSecret=${{ secrets.STRAVA_CLIENT_SECRET }} \
+              StravaRefreshToken=${{ secrets.STRAVA_REFRESH_TOKEN }} \
+              GoogleServiceAccountKey=${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }} \
+              GoogleCalendarId=${{ vars.GOOGLE_CALENDAR_ID }}
