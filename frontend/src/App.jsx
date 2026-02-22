@@ -13,6 +13,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ text: '', type: 'error' }); // type: 'error' | 'success'
   const [calendars, setCalendars] = useState([]);
+  const [isEditingCalendar, setIsEditingCalendar] = useState(false);
 
   const showMessage = (text, type = 'error') => {
     setMsg({ text, type });
@@ -277,66 +278,102 @@ function App() {
           </div>
 
           <div className="card-item fade-in-up" style={{ animationDelay: '0.3s' }}>
-            <div className="icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-            </div>
-            <div className="status-text">
-              <span className="status-title">Choose your destination calendar</span>
-              <span className="status-desc">We recommend creating a standalone calendar called "Strava"</span>
-
-              {calendars.some(c => c.summary.toLowerCase() === 'strava') ? (
-                // Strava calendar exists
-                <select
-                  className="custom-select"
-                  value={user.selectedCalendarId || 'primary'}
-                  onChange={handleCalendarChange}
-                  disabled={calendars.length === 0}
-                  style={{ marginTop: '0.7rem' }}
-                >
-                  {/* Put Strava first if it exists */}
-                  {calendars.filter(c => c.summary.toLowerCase() === 'strava').map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.summary}
-                    </option>
-                  ))}
-                  <option value="primary">Primary Calendar</option>
-                  {calendars.filter(c => !c.primary && c.summary.toLowerCase() !== 'strava').map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.summary}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                // Strava calendar does NOT exist
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.7rem' }}>
-                  <button
-                    className="btn-strava"
-                    onClick={createCalendar}
-                    style={{ width: '100%', padding: '0.8em 1em', fontSize: '0.95rem' }}
-                  >
-                    Create "Strava" Calendar
+            {!isEditingCalendar ? (
+              <>
+                <span className="icon success-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <div className="connect-action">
+                  <div className="status-text">
+                    <span className="status-title">Destination Calendar</span>
+                    <span className="status-desc">
+                      {user.selectedCalendarId && user.selectedCalendarId !== 'primary'
+                        ? (calendars.find(c => c.id === user.selectedCalendarId)?.summary || 'Selected Calendar')
+                        : 'Primary Calendar'}
+                    </span>
+                  </div>
+                  <button className="btn-outline" style={{ padding: '0.5em 1em', fontSize: '0.85rem' }} onClick={() => setIsEditingCalendar(true)}>
+                    Edit
                   </button>
-
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    or pick from the list
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                </div>
+                <div className="status-text">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <span className="status-title" style={{ display: 'block' }}>Choose your destination calendar</span>
+                      <span className="status-desc" style={{ display: 'block', marginTop: '0.2rem' }}>We recommend creating a standalone calendar called "Strava"</span>
+                    </div>
+                    <button className="btn-outline" style={{ padding: '0.3em 0.8em', fontSize: '0.8rem', border: 'none', marginLeft: '1rem' }} onClick={() => setIsEditingCalendar(false)}>
+                      Close
+                    </button>
                   </div>
 
-                  <select
-                    className="custom-select"
-                    value={user.selectedCalendarId || 'primary'}
-                    onChange={handleCalendarChange}
-                    disabled={calendars.length === 0}
-                  >
-                    <option value="primary">Primary Calendar</option>
-                    {calendars.filter(c => !c.primary).map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.summary}
-                      </option>
-                    ))}
-                  </select>
+                  {calendars.some(c => c.summary.toLowerCase() === 'strava') ? (
+                    // Strava calendar exists
+                    <select
+                      className="custom-select"
+                      value={user.selectedCalendarId || 'primary'}
+                      onChange={handleCalendarChange}
+                      disabled={calendars.length === 0}
+                      style={{ marginTop: '1rem' }}
+                    >
+                      {/* Put Strava first if it exists */}
+                      {calendars.filter(c => c.summary.toLowerCase() === 'strava').map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.summary}
+                        </option>
+                      ))}
+                      <option value="primary">Primary Calendar</option>
+                      {calendars.filter(c => !c.primary && c.summary.toLowerCase() !== 'strava').map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.summary}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    // Strava calendar does NOT exist
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                      <button
+                        className="btn-strava"
+                        onClick={createCalendar}
+                        style={{ width: '100%', padding: '0.8em 1em', fontSize: '0.95rem' }}
+                      >
+                        Create "Strava" Calendar
+                      </button>
+
+                      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        or pick from the list
+                      </div>
+
+                      <select
+                        className="custom-select"
+                        value={user.selectedCalendarId || 'primary'}
+                        onChange={handleCalendarChange}
+                        disabled={calendars.length === 0}
+                      >
+                        <option value="primary">Primary Calendar</option>
+                        {calendars.filter(c => !c.primary).map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.summary}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: '1rem' }}>
+                    <span className="status-desc" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      Note: Changing this won't move your past events. Old activities will stay on the previous calendar.
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           <div className="card-item fade-in-up" style={{ animationDelay: '0.4s' }}>
