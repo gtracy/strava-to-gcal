@@ -102,7 +102,7 @@ exports.handler = async (event) => {
             return {
                 statusCode: 200,
                 headers: { "Access-Control-Allow-Origin": "*" },
-                body: JSON.stringify({ user: { googleUserId, email, hasStrava: !!user.stravaAthleteId, selectedCalendarId: user.selectedCalendarId }, token })
+                body: JSON.stringify({ user: { googleUserId, email, hasStrava: !!user.stravaAthleteId, selectedCalendarId: user.selectedCalendarId, metricPreference: user.metricPreference }, token })
             };
         }
 
@@ -133,6 +133,22 @@ exports.handler = async (event) => {
             user.stravaRefreshToken = stravaData.refresh_token;
             user.stravaAthleteId = String(stravaData.athlete.id);
 
+            // Set a smart default for metric preference if not explicitly set already
+            if (!user.metricPreference) {
+                const athletePref = stravaData.athlete.measurement_preference;
+                const athleteCountry = stravaData.athlete.country;
+                if (athletePref === 'meters') {
+                    user.metricPreference = 'km';
+                } else if (athletePref === 'feet') {
+                    user.metricPreference = 'mi';
+                } else if (athleteCountry === 'United States') {
+                    user.metricPreference = 'mi';
+                } else {
+                    user.metricPreference = 'km'; // Fallback
+                }
+                logger.info({ googleUserId: authorizedGoogleId, preference: user.metricPreference }, 'Assigned smart default metric preference');
+            }
+
             await userRepository.saveUser(user);
             logger.info({ googleUserId: authorizedGoogleId, stravaId: user.stravaAthleteId }, 'User connected Strava');
 
@@ -157,7 +173,8 @@ exports.handler = async (event) => {
                 body: JSON.stringify({
                     connected: !!user?.stravaAthleteId,
                     googleUserId,
-                    selectedCalendarId: user?.selectedCalendarId || 'primary'
+                    selectedCalendarId: user?.selectedCalendarId || 'primary',
+                    metricPreference: user?.metricPreference || null
                 })
             };
         }
@@ -272,6 +289,9 @@ exports.handler = async (event) => {
 
             if (updates.selectedCalendarId) {
                 user.selectedCalendarId = updates.selectedCalendarId;
+            }
+            if (updates.metricPreference) {
+                user.metricPreference = updates.metricPreference;
             }
 
             await userRepository.saveUser(user);

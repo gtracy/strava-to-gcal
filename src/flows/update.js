@@ -4,7 +4,7 @@ const authService = require('../services/auth');
 const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
-const { buildEventDescription } = require('../utils/strava-formatter');
+const { buildEventDescription, buildEventLocation } = require('../utils/strava-formatter');
 
 async function handleUpdate(user, stravaActivityId, updates) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId, updates }, 'Handling update flow');
@@ -78,6 +78,11 @@ async function handleUpdate(user, stravaActivityId, updates) {
     let activity;
     try {
         activity = await stravaService.getActivity(stravaAccessToken, stravaActivityId);
+        logger.info({
+            city: activity.location_city,
+            state: activity.location_state,
+            country: activity.location_country
+        }, 'Raw Strava Activity Location Fields');
     } catch (error) {
         logger.error({ errMessage: error.message, status: error.status || error.response?.status, stravaActivityId }, 'Failed to fetch activity from Strava');
         throw error;
@@ -87,11 +92,14 @@ async function handleUpdate(user, stravaActivityId, updates) {
     const startDate = new Date(activity.start_date);
     const endDate = new Date(startDate.getTime() + activity.elapsed_time * 1000);
 
+    const eventLocation = await buildEventLocation(activity);
+
     const eventUpdates = {
         summary: activity.name,
+        location: eventLocation,
         start: { dateTime: startDate.toISOString() },
         end: { dateTime: endDate.toISOString() },
-        description: buildEventDescription(activity),
+        description: buildEventDescription(activity, user.metricPreference),
         extendedProperties: {
             shared: {
                 strava_id: String(stravaActivityId),

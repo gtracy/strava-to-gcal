@@ -8,6 +8,9 @@ const authService = require('../src/services/auth');
 jest.mock('../src/services/strava');
 jest.mock('../src/services/googleCalendar');
 jest.mock('../src/services/auth');
+jest.mock('axios'); // Mock the OSM geocoder
+
+const axios = require('axios');
 
 describe('Flows', () => {
     beforeEach(() => {
@@ -19,6 +22,9 @@ describe('Flows', () => {
         authService.refreshGoogleToken.mockResolvedValue({
             access_token: 'new_google_token',
             refresh_token: 'new_google_refresh_token'
+        });
+        axios.get.mockResolvedValue({
+            data: { address: { city: 'Test City', state: 'Test State', country: 'Test Country' } }
         });
     });
 

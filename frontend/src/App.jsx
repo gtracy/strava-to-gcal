@@ -6,7 +6,7 @@ import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL;
 const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
-const REDIRECT_URI = window.location.origin + '/strava-callback';
+const REDIRECT_URI = window.location.origin;
 
 function App() {
   const [user, setUser] = useState(null);
@@ -39,8 +39,8 @@ function App() {
       } else {
         showMessage('Please login with Google first (Session lost).');
       }
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Clean URL back to root to remove OAuth query parameters
+      window.history.replaceState({}, document.title, '/');
     }
 
     // Auto-fetch calendars on load if we have a user in session
@@ -112,7 +112,7 @@ function App() {
     } catch (err) {
       console.error("Failed to fetch calendars", err);
       if (err.response?.status === 401 || err.response?.status === 404) {
-        handleLogout('Session expired or database reset. Please log in again.');
+        handleLogout('Session expired. Please log in again.');
       }
     }
   };
@@ -134,7 +134,7 @@ function App() {
     } catch (err) {
       console.error("Failed to create calendar", err);
       if (err.response?.status === 401 || err.response?.status === 404) {
-        handleLogout('Session expired or database reset. Please log in again.');
+        handleLogout('Session expired. Please log in again.');
         return;
       }
       const errorMsg = err.response?.data?.error || 'Failed to create calendar';
@@ -153,6 +153,7 @@ function App() {
 
   const handleCalendarChange = async (e) => {
     const newCalendarId = e.target.value;
+    const prevCalendarId = user.selectedCalendarId;
     try {
       // Optimistic update
       const updatedUser = { ...user, selectedCalendarId: newCalendarId };

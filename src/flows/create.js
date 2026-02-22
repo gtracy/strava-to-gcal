@@ -4,7 +4,7 @@ const authService = require('../services/auth');
 const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
-const { buildEventDescription } = require('../utils/strava-formatter');
+const { buildEventDescription, buildEventLocation } = require('../utils/strava-formatter');
 
 async function handleCreate(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling create flow');
@@ -76,11 +76,14 @@ async function handleCreate(user, stravaActivityId) {
     const startDate = new Date(activity.start_date); // UTC
     const endDate = new Date(startDate.getTime() + activity.elapsed_time * 1000);
 
+    const eventLocation = await buildEventLocation(activity);
+
     const eventData = {
         summary: activity.name,
+        location: eventLocation,
         start: { dateTime: startDate.toISOString() },
         end: { dateTime: endDate.toISOString() },
-        description: buildEventDescription(activity),
+        description: buildEventDescription(activity, user.metricPreference),
         extendedProperties: {
             shared: {
                 strava_id: String(stravaActivityId),

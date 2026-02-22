@@ -1,4 +1,7 @@
-const { buildEventDescription, formatDuration, formatSpeed } = require('../src/utils/strava-formatter');
+const { buildEventDescription, buildEventLocation, formatDuration, formatSpeed } = require('../src/utils/strava-formatter');
+const axios = require('axios');
+
+jest.mock('axios');
 
 describe('strava-formatter utilities', () => {
 
@@ -22,11 +25,18 @@ describe('strava-formatter utilities', () => {
             expect(formatSpeed(10, false)).toBe('36.0 km/h (22.4 mph)');
         });
 
-        it('should format running pace to min/km', () => {
+        it('should format running pace to min/km and min/mi', () => {
             // 3.33 m/s = ~5:00 /km
-            expect(formatSpeed(3.333333, true)).toBe('5:00 /km');
+            expect(formatSpeed(3.333333, true)).toBe('5:00 /km (8:03 /mi)');
             // String padding check
-            expect(formatSpeed(3.03, true)).toBe('5:30 /km');
+            expect(formatSpeed(3.03, true)).toBe('5:30 /km (8:51 /mi)');
+        });
+
+        it('should format preferences correctly', () => {
+            expect(formatSpeed(10, false, 'km')).toBe('36.0 km/h');
+            expect(formatSpeed(10, false, 'mi')).toBe('22.4 mph');
+            expect(formatSpeed(3.333333, true, 'km')).toBe('5:00 /km');
+            expect(formatSpeed(3.333333, true, 'mi')).toBe('8:03 /mi');
         });
 
         it('should return null for falsey inputs', () => {
@@ -96,12 +106,82 @@ describe('strava-formatter utilities', () => {
 
             const desc = buildEventDescription(activity);
             expect(desc).toContain('Type: Run');
-            expect(desc).toContain('Average Speed: 5:00 /km');
-            expect(desc).toContain('Max Speed: 3:42 /km');
+            expect(desc).toContain('Average Speed: 5:00 /km (8:03 /mi)');
+            expect(desc).toContain('Max Speed: 3:42 /km (5:58 /mi)');
             expect(desc).toContain('Average Heart Rate: 151 bpm');
             expect(desc).toContain('Max Heart Rate: 180 bpm');
             expect(desc).toContain('Relative Effort: 55');
             expect(desc).not.toContain('Power');
+        });
+
+        it('should respect metric preference when set', () => {
+            const activity = {
+                id: 222,
+                type: 'Run',
+                distance: 5000,
+                total_elevation_gain: 100,
+                average_speed: 3.333333
+            };
+
+            const descKm = buildEventDescription(activity, 'km');
+            expect(descKm).toContain('Distance: 5.00 km');
+            expect(descKm).not.toContain('mi');
+            expect(descKm).toContain('Elevation Gain: 100 m');
+            expect(descKm).not.toContain('ft');
+            expect(descKm).toContain('Average Speed: 5:00 /km');
+            expect(descKm).not.toContain('8:03');
+
+            const descMi = buildEventDescription(activity, 'mi');
+            expect(descMi).toContain('Distance: 3.11 mi');
+            expect(descMi).not.toContain('5.00 km');
+            expect(descMi).toContain('Elevation Gain: 328 ft');
+            expect(descMi).not.toContain('100 m');
+            expect(descMi).toContain('Average Speed: 8:03 /mi');
+            expect(descMi).not.toContain('5:00');
+        });
+    });
+
+    describe('buildEventLocation', () => {
+
+        beforeEach(() => {
+            jest.clearAllMocks();
+        });
+
+        it('should use native fields if provided by Strava', async () => {
+            const activity = {
+                location_city: 'San Francisco',
+                location_state: 'CA',
+                location_country: 'United States'
+            };
+            // No axios call needed if native fields exist
+            await expect(buildEventLocation(activity)).resolves.toBe('San Francisco, CA, United States');
+            expect(axios.get).not.toHaveBeenCalled();
+        });
+
+        it('should reverse geocode if no native fields but start_latlng exists', async () => {
+            const activity = { start_latlng: [37.7749, -122.4194] };
+            axios.get.mockResolvedValueOnce({
+                data: {
+                    address: {
+                        city: 'San Francisco',
+                        state: 'California',
+                        country: 'United States'
+                    }
+                }
+            });
+
+            await expect(buildEventLocation(activity)).resolves.toBe('San Francisco, California, United States');
+            expect(axios.get).toHaveBeenCalled();
+        });
+
+        it('should return undefined if axios fails', async () => {
+            const activity = { start_latlng: [1, 1] };
+            axios.get.mockRejectedValueOnce(new Error('Network error'));
+            await expect(buildEventLocation(activity)).resolves.toBeUndefined();
+        });
+
+        it('should return undefined if no location data exists at all', async () => {
+            await expect(buildEventLocation({})).resolves.toBeUndefined();
         });
     });
 });
