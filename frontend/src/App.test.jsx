@@ -11,6 +11,6 @@ vi.mock('@react-oauth/google', () => ({
 describe('App', () => {
     it('renders without crashing', () => {
         render(<App />);
-        expect(screen.getByText(/Sign in with Google/i)).toBeInTheDocument();
+        expect(screen.getByText(/Continue with Google/i)).toBeInTheDocument();
     });
 });

@@ -40,6 +40,7 @@ export class InfrastructureStack extends cdk.Stack {
         // But for parity with the template.yaml, we'll leave placeholders or expect them in the environment
         STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
         STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
+        STRAVA_VERIFY_TOKEN: process.env.STRAVA_VERIFY_TOKEN || 'strava-verify-token-fallback',
         GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
         GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
         JWT_SECRET: process.env.JWT_SECRET || 'fallback-secret-for-cdk-synth'

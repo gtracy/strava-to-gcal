@@ -50,6 +50,16 @@ The frontend (Vite + React) uses a layered testing approach:
     ```
     This reads from `env.json` and runs `src/app.js` directly. Use this for rapid iteration.
 
+### Webhooks Dev Script
+
+An interactive CLI script is provided to manage your Strava webhooks locally (list, create, delete, and test with mock data).
+Ensure your `env.json` is configured with your Strava credentials and `STRAVA_VERIFY_TOKEN`.
+Run the script using:
+```bash
+npm run webhook-setup
+```
+If you are creating a new webhook destination locally, you will need a publicly accessible URL, which you can easily set up using [ngrok](https://ngrok.com/): `ngrok http 3000`.
+
 ### Frontend Setup
 
 1.  **Configure Environment Variables**:

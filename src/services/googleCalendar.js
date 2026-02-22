@@ -22,7 +22,7 @@ async function listCalendars(auth) {
             primary: item.primary
         }));
     } catch (error) {
-        logger.error({ err: error }, 'Failed to list calendars');
+        logger.error({ errMessage: error.message, status: error.code || error.status }, 'Failed to list calendars');
         throw error;
     }
 }
@@ -37,7 +37,7 @@ async function findEventByStravaId(auth, stravaId, calendarId = 'primary') {
         });
         return res.data.items[0] || null;
     } catch (error) {
-        logger.error({ err: error, stravaId }, 'Failed to find event by Strava ID');
+        logger.error({ errMessage: error.message, status: error.code || error.status, stravaId }, 'Failed to find event by Strava ID');
         throw error;
     }
 }
@@ -53,7 +53,7 @@ async function createEvent(auth, eventData, calendarId = 'primary') {
         logger.debug({ eventId: res.data.id }, 'Created event');
         return res.data;
     } catch (error) {
-        logger.error({ err: error, eventData }, 'Failed to create event');
+        logger.error({ errMessage: error.message, status: error.code || error.status, eventData }, 'Failed to create event');
         throw error;
     }
 }
@@ -70,7 +70,7 @@ async function patchEvent(auth, eventId, eventData, calendarId = 'primary') {
         logger.debug('Patched event');
         return res.data;
     } catch (error) {
-        logger.error({ err: error, eventId }, 'Failed to patch event');
+        logger.error({ errMessage: error.message, status: error.code || error.status, eventId }, 'Failed to patch event');
         throw error;
     }
 }
@@ -85,7 +85,24 @@ async function deleteEvent(auth, eventId, calendarId = 'primary') {
         });
         logger.debug('Deleted event');
     } catch (error) {
-        logger.error({ err: error, eventId }, 'Failed to delete event');
+        logger.error({ errMessage: error.message, status: error.code || error.status, eventId }, 'Failed to delete event');
+        throw error;
+    }
+}
+
+async function createCalendar(auth, summary) {
+    const calendar = getCalendarClient(auth);
+    try {
+        logger.debug({ summary }, 'Creating new calendar');
+        const res = await calendar.calendars.insert({
+            requestBody: {
+                summary: summary
+            }
+        });
+        logger.debug({ calendarId: res.data.id }, 'Created new calendar');
+        return res.data;
+    } catch (error) {
+        logger.error({ errMessage: error.message, status: error.code || error.status, summary }, 'Failed to create calendar');
         throw error;
     }
 }
@@ -96,4 +113,5 @@ module.exports = {
     patchEvent,
     deleteEvent,
     listCalendars,
+    createCalendar,
 };

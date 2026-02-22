@@ -27,7 +27,7 @@ async function handleDelete(user, stravaActivityId) {
             tokensUpdated = true;
         }
     } catch (e) {
-        logger.error({ err: e }, 'Failed to refresh Google token');
+        logger.error({ errMessage: e.message, status: e.status || e.response?.status }, 'Failed to refresh Google token');
         throw e;
     }
 
@@ -35,7 +35,7 @@ async function handleDelete(user, stravaActivityId) {
         try {
             await userRepository.saveUser(user);
         } catch (e) {
-            logger.warn({ err: e }, 'Failed to save user tokens');
+            logger.warn({ errMessage: e.message, name: e.name }, 'Failed to save user tokens');
         }
     }
 

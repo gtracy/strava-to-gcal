@@ -1,0 +1,103 @@
+process.env.STRAVA_VERIFY_TOKEN = 'test-token';
+
+const app = require('../src/app');
+const userRepository = require('../src/repositories/user-repository');
+const createFlow = require('../src/flows/create');
+const updateFlow = require('../src/flows/update');
+const deleteFlow = require('../src/flows/delete');
+
+jest.mock('../src/repositories/user-repository');
+jest.mock('../src/flows/create');
+jest.mock('../src/flows/update');
+jest.mock('../src/flows/delete');
+
+describe('Webhook Endpoints', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    describe('GET /webhook', () => {
+        it('should return 200 and challenge on valid verify request', async () => {
+            const event = {
+                routeKey: 'GET /webhook',
+                rawQueryString: 'hub.mode=subscribe&hub.challenge=1234&hub.verify_token=test-token'
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(200);
+            expect(JSON.parse(response.body)["hub.challenge"]).toBe("1234");
+        });
+
+        it('should return 403 on invalid verify token', async () => {
+            const event = {
+                routeKey: 'GET /webhook',
+                rawQueryString: 'hub.mode=subscribe&hub.challenge=1234&hub.verify_token=wrong-token'
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(403);
+            expect(response.body).toBe("Forbidden");
+        });
+
+        it('should return 200 (OK) for requests without verification params', async () => {
+            const event = {
+                routeKey: 'GET /webhook',
+                rawQueryString: 'foo=bar'
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(200);
+            expect(response.body).toBe("OK");
+        });
+    });
+
+    describe('POST /webhook', () => {
+        it('should process create aspect type', async () => {
+            const user = { googleUserId: 'test-user', stravaAthleteId: '123' };
+            userRepository.getUserByStravaAthleteId.mockResolvedValue(user);
+
+            const event = {
+                routeKey: 'POST /webhook',
+                body: JSON.stringify({ aspect_type: 'create', object_id: 'abc', owner_id: '123' })
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(200);
+            expect(createFlow.handleCreate).toHaveBeenCalledWith(user, 'abc');
+        });
+
+        it('should process update aspect type', async () => {
+            const user = { googleUserId: 'test-user', stravaAthleteId: '123' };
+            userRepository.getUserByStravaAthleteId.mockResolvedValue(user);
+
+            const event = {
+                routeKey: 'POST /webhook',
+                body: JSON.stringify({ aspect_type: 'update', object_id: 'abc', owner_id: '123', updates: { title: 'new' } })
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(200);
+            expect(updateFlow.handleUpdate).toHaveBeenCalledWith(user, 'abc', { title: 'new' });
+        });
+
+        it('should process delete aspect type', async () => {
+            const user = { googleUserId: 'test-user', stravaAthleteId: '123' };
+            userRepository.getUserByStravaAthleteId.mockResolvedValue(user);
+
+            const event = {
+                routeKey: 'POST /webhook',
+                body: JSON.stringify({ aspect_type: 'delete', object_id: 'abc', owner_id: '123' })
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(200);
+            expect(deleteFlow.handleDelete).toHaveBeenCalledWith(user, 'abc');
+        });
+
+        it('should ignore events for unknown users but return 200', async () => {
+            userRepository.getUserByStravaAthleteId.mockResolvedValue(null);
+
+            const event = {
+                routeKey: 'POST /webhook',
+                body: JSON.stringify({ aspect_type: 'create', object_id: 'abc', owner_id: 'unknown' })
+            };
+            const response = await app.handler(event);
+            expect(response.statusCode).toBe(200);
+            expect(createFlow.handleCreate).not.toHaveBeenCalled();
+        });
+    });
+});

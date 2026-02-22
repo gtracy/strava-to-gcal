@@ -1,6 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { mockClient } = require('aws-sdk-client-mock');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 // 1. Load Environment Variables
 const envPath = path.join(__dirname, '..', 'env.json');
@@ -29,10 +31,31 @@ if (fs.existsSync(envPath)) {
     console.warn("Warning: env.json not found. Environment variables might be missing.");
 }
 
-// 2. Require App (must happen AFTER env vars are loaded)
+// 2. Mock DynamoDB Client for Local Dev
+const ddbMock = mockClient(DynamoDBDocumentClient);
+const localMemDb = new Map();
+
+ddbMock.on(PutCommand).callsFake((input) => {
+    localMemDb.set(input.Item.googleUserId, input.Item);
+    return {};
+});
+
+ddbMock.on(GetCommand).callsFake((input) => {
+    const item = localMemDb.get(input.Key.googleUserId);
+    return { Item: item };
+});
+
+ddbMock.on(QueryCommand).callsFake((input) => {
+    // Basic mock for StravaAthleteIndex
+    const stravaId = input.ExpressionAttributeValues[':stravaAthleteId'];
+    const items = Array.from(localMemDb.values()).filter(user => user.stravaAthleteId === stravaId);
+    return { Items: items };
+});
+
+// 3. Require App (must happen AFTER env vars are loaded and mocks setup)
 const { handler } = require('../src/app');
 
-// 3. Create Server
+// 4. Create Server
 const server = http.createServer(async (req, res) => {
     // Collect Body
     let body = '';
@@ -57,6 +80,14 @@ const server = http.createServer(async (req, res) => {
 
         try {
             console.log(`[${req.method}] ${req.url}`);
+
+            if (req.method === 'GET' && url.pathname === '/test/db') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.end(JSON.stringify(Array.from(localMemDb.entries()), null, 2));
+                return;
+            }
 
             const result = await handler(event);
 

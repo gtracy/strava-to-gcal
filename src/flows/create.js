@@ -4,6 +4,7 @@ const authService = require('../services/auth');
 const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
+const { buildEventDescription } = require('../utils/strava-formatter');
 
 async function handleCreate(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling create flow');
@@ -21,7 +22,7 @@ async function handleCreate(user, stravaActivityId) {
             tokensUpdated = true;
         }
     } catch (e) {
-        logger.error({ err: e }, 'Failed to refresh Strava token');
+        logger.error({ errMessage: e.message, status: e.status || e.response?.status }, 'Failed to refresh Strava token');
         throw e;
     }
 
@@ -42,7 +43,7 @@ async function handleCreate(user, stravaActivityId) {
             tokensUpdated = true;
         }
     } catch (e) {
-        logger.error({ err: e }, 'Failed to refresh Google token');
+        logger.error({ errMessage: e.message, status: e.status || e.response?.status }, 'Failed to refresh Google token');
         throw e;
     }
 
@@ -50,7 +51,7 @@ async function handleCreate(user, stravaActivityId) {
         try {
             await userRepository.saveUser(user);
         } catch (e) {
-            logger.warn({ err: e }, 'Failed to save user tokens');
+            logger.warn({ errMessage: e.message, name: e.name }, 'Failed to save user tokens');
         }
     }
 
@@ -67,7 +68,7 @@ async function handleCreate(user, stravaActivityId) {
     try {
         activity = await stravaService.getActivity(stravaAccessToken, stravaActivityId);
     } catch (error) {
-        logger.error({ err: error, stravaActivityId }, 'Failed to fetch activity from Strava');
+        logger.error({ errMessage: error.message, status: error.status || error.response?.status, stravaActivityId }, 'Failed to fetch activity from Strava');
         throw error;
     }
 
@@ -79,7 +80,7 @@ async function handleCreate(user, stravaActivityId) {
         summary: activity.name,
         start: { dateTime: startDate.toISOString() },
         end: { dateTime: endDate.toISOString() },
-        description: `View on Strava: https://strava.com/activities/${stravaActivityId}\n\nType: ${activity.type}\nDistance: ${(activity.distance / 1000).toFixed(2)} km`,
+        description: buildEventDescription(activity),
         extendedProperties: {
             shared: {
                 strava_id: String(stravaActivityId),

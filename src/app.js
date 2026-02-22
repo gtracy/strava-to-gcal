@@ -6,6 +6,38 @@ const authService = require('./services/auth');
 const googleCalendarService = require('./services/googleCalendar');
 const userRepository = require('./repositories/user-repository');
 const { google } = require('googleapis');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
+
+const verifySession = (headers) => {
+    if (!headers || !headers.authorization) throw new Error('Missing Authorization');
+    const token = headers.authorization.split(' ')[1];
+    return jwt.verify(token, JWT_SECRET).googleUserId;
+};
+
+const handleError = (error, context = {}) => {
+    // Determine status code based on common error types or our explicit throwing
+    const statusCode = error.statusCode || error.response?.status || (error.message.includes('Unauthorized') ? 401 : 500);
+
+    const errorSummary = {
+        message: error.message,
+        name: error.name,
+        statusCode
+    };
+
+    // Log the error securely with pino
+    logger.error({ err: errorSummary, ...context }, 'Unhandled API Error');
+
+    // Return a safe, sanitized client response
+    return {
+        statusCode,
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+            error: statusCode === 500 ? 'Internal Server Error' : error.message
+        })
+    };
+};
 
 exports.handler = async (event) => {
     logger.debug({
@@ -41,8 +73,9 @@ exports.handler = async (event) => {
 
             // 2. Verify ID Token from the exchange
             if (!tokens.id_token) {
-                logger.error('No ID Token in Google token exchange');
-                return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Invalid Google Login' };
+                const err = new Error('No ID Token in Google token exchange');
+                err.statusCode = 401;
+                throw err;
             }
 
             const payload = await authService.verifyGoogleToken(tokens.id_token);
@@ -64,38 +97,37 @@ exports.handler = async (event) => {
             await userRepository.saveUser(user);
             logger.info({ googleUserId }, 'User authenticated with Google');
 
+            const token = jwt.sign({ googleUserId }, JWT_SECRET, { expiresIn: '1d' });
+
             return {
                 statusCode: 200,
                 headers: { "Access-Control-Allow-Origin": "*" },
-                body: JSON.stringify({ user: { googleUserId, email, hasStrava: !!user.stravaAthleteId } })
+                body: JSON.stringify({ user: { googleUserId, email, hasStrava: !!user.stravaAthleteId, selectedCalendarId: user.selectedCalendarId }, token })
             };
         }
 
         // POST /auth/strava
         if (routeKey === 'POST /auth/strava') {
-            const { googleUserId, code } = JSON.parse(body); // passed from frontend (or we get it from session if we had one)
-            // For this stateless Lambda, frontend must send googleUserId (and maybe verify it with a token, but for now trusting it if this is MVP, 
-            // ideally we pass the Google ID Token again to verify identity).
-            // BETTER: Pass Google ID Token in Authorization header to identify the user.
+            const { code } = JSON.parse(body);
 
-            // Let's assume the frontend sends 'Authorization: Bearer <id_token>'
-            let authorizedGoogleId = googleUserId; // fallback if no header check implemented yet
-
-            if (headers && headers.authorization) {
-                const idToken = headers.authorization.split(' ')[1];
-                try {
-                    const payload = await authService.verifyGoogleToken(idToken);
-                    authorizedGoogleId = payload.sub;
-                } catch (e) {
-                    return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Unauthorized' };
-                }
+            let authorizedGoogleId;
+            try {
+                authorizedGoogleId = verifySession(headers);
+            } catch (e) {
+                const err = new Error('Unauthorized');
+                err.statusCode = 401;
+                throw err;
             }
 
             const stravaData = await authService.exchangeStravaCode(code);
             // stravaData: access_token, refresh_token, athlete: { id, ... }
 
             const user = await userRepository.getUserByGoogleId(authorizedGoogleId);
-            if (!user) return { statusCode: 404, headers: { "Access-Control-Allow-Origin": "*" }, body: 'User not found' };
+            if (!user) {
+                const err = new Error('User not found');
+                err.statusCode = 404;
+                throw err;
+            }
 
             user.stravaAccessToken = stravaData.access_token;
             user.stravaRefreshToken = stravaData.refresh_token;
@@ -109,19 +141,13 @@ exports.handler = async (event) => {
 
         // GET /user/status
         if (routeKey === 'GET /user/status') {
-            // Expect valid Google ID Token
-            if (!headers || !headers.authorization) return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Missing Authorization' };
-            const idToken = headers.authorization.split(' ')[1];
             let googleUserId;
-            if (idToken.startsWith('mock_token_for_')) {
-                googleUserId = idToken.replace('mock_token_for_', '');
-            } else {
-                try {
-                    const payload = await authService.verifyGoogleToken(idToken);
-                    googleUserId = payload.sub;
-                } catch (e) {
-                    return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Unauthorized' };
-                }
+            try {
+                googleUserId = verifySession(headers);
+            } catch (e) {
+                const err = new Error('Unauthorized');
+                err.statusCode = 401;
+                throw err;
             }
 
             const user = await userRepository.getUserByGoogleId(googleUserId);
@@ -138,30 +164,30 @@ exports.handler = async (event) => {
 
         // GET /user/calendars
         if (routeKey === 'GET /user/calendars') {
-            if (!headers || !headers.authorization) return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Missing Authorization' };
-            const idToken = headers.authorization.split(' ')[1];
             let googleUserId;
-            if (idToken.startsWith('mock_token_for_')) {
-                googleUserId = idToken.replace('mock_token_for_', '');
-            } else {
-                try {
-                    const payload = await authService.verifyGoogleToken(idToken);
-                    googleUserId = payload.sub;
-                } catch (e) {
-                    return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Unauthorized' };
-                }
+            try {
+                googleUserId = verifySession(headers);
+            } catch (e) {
+                const err = new Error('Unauthorized');
+                err.statusCode = 401;
+                throw err;
             }
 
             const user = await userRepository.getUserByGoogleId(googleUserId);
-            if (!user) return { statusCode: 404, headers: { "Access-Control-Allow-Origin": "*" }, body: 'User not found' };
+            if (!user) {
+                const err = new Error('User not found');
+                err.statusCode = 404;
+                throw err;
+            }
 
             // Refresh Google Token if needed to call Calendar API
             let googleCredentials;
             try {
                 googleCredentials = await authService.refreshGoogleToken(user.googleRefreshToken);
             } catch (e) {
-                logger.error({ err: e }, 'Failed to refresh Google token for list');
-                return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Failed to refresh token' };
+                const err = new Error('Failed to refresh Google token');
+                err.statusCode = 401;
+                throw err;
             }
 
             const googleAuthClient = new google.auth.OAuth2(
@@ -170,33 +196,79 @@ exports.handler = async (event) => {
             );
             googleAuthClient.setCredentials(googleCredentials);
 
+            const calendars = await googleCalendarService.listCalendars(googleAuthClient);
+            return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(calendars) };
+        }
+
+        // POST /user/calendars/strava
+        if (routeKey === 'POST /user/calendars/strava') {
+            let googleUserId;
             try {
-                const calendars = await googleCalendarService.listCalendars(googleAuthClient);
-                return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(calendars) };
+                googleUserId = verifySession(headers);
             } catch (e) {
-                return { statusCode: 500, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Failed to fetch calendars' };
+                const err = new Error('Unauthorized');
+                err.statusCode = 401;
+                throw err;
             }
+
+            const user = await userRepository.getUserByGoogleId(googleUserId);
+            if (!user) {
+                const err = new Error('User not found');
+                err.statusCode = 404;
+                throw err;
+            }
+
+            // Refresh Google Token if needed to call Calendar API
+            let googleCredentials;
+            try {
+                googleCredentials = await authService.refreshGoogleToken(user.googleRefreshToken);
+            } catch (e) {
+                const err = new Error('Failed to refresh Google token');
+                err.statusCode = 401;
+                throw err;
+            }
+
+            const googleAuthClient = new google.auth.OAuth2(
+                process.env.GOOGLE_CLIENT_ID,
+                process.env.GOOGLE_CLIENT_SECRET
+            );
+            googleAuthClient.setCredentials(googleCredentials);
+
+            // Create Calendar
+            const newCalendar = await googleCalendarService.createCalendar(googleAuthClient, 'Strava');
+
+            // Auto Select it for the user
+            user.selectedCalendarId = newCalendar.id;
+            await userRepository.saveUser(user);
+
+            return {
+                statusCode: 200,
+                headers: { "Access-Control-Allow-Origin": "*" },
+                body: JSON.stringify({
+                    success: true,
+                    calendarId: newCalendar.id
+                })
+            };
         }
 
         // PATCH /user
         if (routeKey === 'PATCH /user') {
-            if (!headers || !headers.authorization) return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Missing Authorization' };
-            const idToken = headers.authorization.split(' ')[1];
             let googleUserId;
-            if (idToken.startsWith('mock_token_for_')) {
-                googleUserId = idToken.replace('mock_token_for_', '');
-            } else {
-                try {
-                    const payload = await authService.verifyGoogleToken(idToken);
-                    googleUserId = payload.sub;
-                } catch (e) {
-                    return { statusCode: 401, headers: { "Access-Control-Allow-Origin": "*" }, body: 'Unauthorized' };
-                }
+            try {
+                googleUserId = verifySession(headers);
+            } catch (e) {
+                const err = new Error('Unauthorized');
+                err.statusCode = 401;
+                throw err;
             }
 
             const updates = JSON.parse(body);
             const user = await userRepository.getUserByGoogleId(googleUserId);
-            if (!user) return { statusCode: 404, headers: { "Access-Control-Allow-Origin": "*" }, body: 'User not found' };
+            if (!user) {
+                const err = new Error('User not found');
+                err.statusCode = 404;
+                throw err;
+            }
 
             if (updates.selectedCalendarId) {
                 user.selectedCalendarId = updates.selectedCalendarId;
@@ -214,14 +286,23 @@ exports.handler = async (event) => {
             const params = new URLSearchParams(rawQueryString);
             const challenge = params.get('hub.challenge');
             const verifyToken = params.get('hub.verify_token');
+            const mode = params.get('hub.mode');
 
-            logger.info('Verifying webhook subscription');
-            // Check verifyToken if needed
+            if (mode && verifyToken) {
+                if (mode === 'subscribe' && verifyToken === process.env.STRAVA_VERIFY_TOKEN) {
+                    logger.info('Verifying webhook subscription');
+                    return {
+                        statusCode: 200,
+                        body: JSON.stringify({ "hub.challenge": challenge })
+                    };
+                } else {
+                    logger.warn({ mode, verifyToken }, 'Webhook verification failed: token or mode mismatch');
+                    return { statusCode: 403, body: 'Forbidden' };
+                }
+            }
 
-            return {
-                statusCode: 200,
-                body: JSON.stringify({ "hub.challenge": challenge })
-            };
+            logger.debug({ payload: rawQueryString, body }, 'Webhook reached without verification params');
+            return { statusCode: 200, body: 'OK' };
         }
 
         // POST /webhook - Event ingestion
@@ -249,10 +330,9 @@ exports.handler = async (event) => {
             return { statusCode: 200, body: 'OK' };
         }
 
-        return { statusCode: 404, body: 'Not Found' };
+        return { statusCode: 404, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: 'Not Found' }) };
 
     } catch (error) {
-        logger.error({ err: error }, 'Internal Server Error');
-        return { statusCode: 500, body: `Internal Server Error: ${error.message}` };
+        return handleError(error, { routeKey });
     }
 };

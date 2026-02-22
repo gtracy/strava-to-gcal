@@ -15,7 +15,13 @@ async function getActivity(accessToken, id) {
         logger.debug({ stravaId: id, status: response.status }, 'Fetched Strava activity');
         return response.data;
     } catch (error) {
-        logger.error({ err: error, stravaId: id }, 'Failed to fetch Strava activity');
+        const errorDetails = error.response?.data ? {
+            status: error.response.status,
+            stravaMessage: error.response.data.message,
+            stravaErrors: error.response.data.errors
+        } : { errMessage: error.message };
+
+        logger.error({ stravaId: id, ...errorDetails }, 'Failed to fetch Strava activity');
         throw error;
     }
 }

@@ -50,7 +50,13 @@ class AuthService {
             });
             return response.data;
         } catch (error) {
-            logger.error({ err: error }, 'Error exchanging Strava Code');
+            const errorDetails = error.response?.data ? {
+                status: error.response.status,
+                stravaMessage: error.response.data.message,
+                stravaErrors: error.response.data.errors
+            } : { errMessage: error.message };
+
+            logger.error({ ...errorDetails }, 'Error exchanging Strava Code');
             throw error;
         }
     }
@@ -74,7 +80,13 @@ class AuthService {
             });
             return response.data;
         } catch (error) {
-            logger.error({ err: error }, 'Error refreshing Strava Token');
+            const errorDetails = error.response?.data ? {
+                status: error.response.status,
+                stravaMessage: error.response.data.message,
+                stravaErrors: error.response.data.errors
+            } : { errMessage: error.message };
+
+            logger.error({ ...errorDetails }, 'Error refreshing Strava Token');
             throw error;
         }
     }

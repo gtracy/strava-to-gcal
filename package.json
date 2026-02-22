@@ -6,7 +6,8 @@
   "scripts": {
     "test": "jest",
     "deploy": "sam deploy",
-    "local": "node scripts/local-server.js"
+    "local": "node scripts/local-server.js",
+    "webhook-setup": "node scripts/strava-webhooks.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.980.0",
@@ -15,6 +16,7 @@
     "axios": "^1.13.4",
     "google-auth-library": "^10.5.0",
     "googleapis": "^126.0.0",
+    "jsonwebtoken": "^9.0.3",
     "pino": "^8.16.0"
   },
   "devDependencies": {

@@ -6,7 +6,15 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 class UserRepository {
     constructor() {
-        const client = new DynamoDBClient({});
+        const clientOptions = {};
+        if (process.env.AWS_REGION) {
+            clientOptions.region = process.env.AWS_REGION;
+        } else {
+            // Default region for local development if not provided but SDK requires it
+            clientOptions.region = 'us-east-1';
+        }
+
+        const client = new DynamoDBClient(clientOptions);
         this.docClient = DynamoDBDocumentClient.from(client);
         this.tableName = process.env.USERS_TABLE_NAME;
     }
@@ -22,7 +30,7 @@ class UserRepository {
             logger.info({ googleUserId: user.googleUserId }, 'User saved successfully');
             return user;
         } catch (error) {
-            logger.error({ err: error, googleUserId: user.googleUserId }, 'Error saving user');
+            logger.error({ errMessage: error.message, name: error.name, googleUserId: user.googleUserId }, 'Error saving user');
             throw error;
         }
     }
@@ -37,7 +45,7 @@ class UserRepository {
             const { Item } = await this.docClient.send(new GetCommand(params));
             return Item;
         } catch (error) {
-            logger.error({ err: error, googleUserId }, 'Error getting user by Google ID');
+            logger.error({ errMessage: error.message, name: error.name, googleUserId }, 'Error getting user by Google ID');
             throw error;
         }
     }
@@ -57,7 +65,7 @@ class UserRepository {
             // We assume one user per Strava ID for now, but index allows multiple theoretically
             return Items && Items.length > 0 ? Items[0] : null;
         } catch (error) {
-            logger.error({ err: error, stravaAthleteId }, 'Error getting user by Strava Athlete ID');
+            logger.error({ errMessage: error.message, name: error.name, stravaAthleteId }, 'Error getting user by Strava Athlete ID');
             throw error;
         }
     }
