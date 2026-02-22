@@ -59,7 +59,9 @@ async function handleCreate(user, stravaActivityId) {
     const calendarId = user.selectedCalendarId || 'primary';
     const existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
     if (existingEvent) {
-        logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Event already exists, skipping creation');
+        logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Event already exists, routing to update flow to force sync');
+        const updateFlow = require('./update');
+        await updateFlow.handleUpdate(user, stravaActivityId, { force: true });
         return;
     }
 

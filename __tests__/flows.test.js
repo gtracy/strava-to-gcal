@@ -89,10 +89,7 @@ describe('Flows', () => {
             );
         });
 
-        it('should skip update if no relevant fields changed', async () => {
-            await updateFlow.handleUpdate(mockUser, 123, { description: 'stuff' });
-            expect(googleCalendarService.findEventByStravaId).not.toHaveBeenCalled();
-        });
+
     });
 
     describe('Delete Flow', () => {

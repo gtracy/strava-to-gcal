@@ -2,14 +2,10 @@ process.env.STRAVA_VERIFY_TOKEN = 'test-token';
 
 const app = require('../src/app');
 const userRepository = require('../src/repositories/user-repository');
-const createFlow = require('../src/flows/create');
-const updateFlow = require('../src/flows/update');
-const deleteFlow = require('../src/flows/delete');
+const queueService = require('../src/services/queue');
 
 jest.mock('../src/repositories/user-repository');
-jest.mock('../src/flows/create');
-jest.mock('../src/flows/update');
-jest.mock('../src/flows/delete');
+jest.mock('../src/services/queue');
 
 describe('Webhook Endpoints', () => {
     beforeEach(() => {
@@ -59,7 +55,7 @@ describe('Webhook Endpoints', () => {
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
-            expect(createFlow.handleCreate).toHaveBeenCalledWith(user, 'abc');
+            expect(queueService.enqueueActivitySync).toHaveBeenCalledWith('123', 'abc', 'create', undefined);
         });
 
         it('should process update aspect type', async () => {
@@ -72,7 +68,7 @@ describe('Webhook Endpoints', () => {
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
-            expect(updateFlow.handleUpdate).toHaveBeenCalledWith(user, 'abc', { title: 'new' });
+            expect(queueService.enqueueActivitySync).toHaveBeenCalledWith('123', 'abc', 'update', { title: 'new' });
         });
 
         it('should process delete aspect type', async () => {
@@ -85,7 +81,7 @@ describe('Webhook Endpoints', () => {
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
-            expect(deleteFlow.handleDelete).toHaveBeenCalledWith(user, 'abc');
+            expect(queueService.enqueueActivitySync).toHaveBeenCalledWith('123', 'abc', 'delete', undefined);
         });
 
         it('should ignore events for unknown users but return 200', async () => {
@@ -97,7 +93,7 @@ describe('Webhook Endpoints', () => {
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
-            expect(createFlow.handleCreate).not.toHaveBeenCalled();
+            expect(queueService.enqueueActivitySync).not.toHaveBeenCalled();
         });
     });
 });

@@ -57,14 +57,10 @@ async function handleUpdate(user, stravaActivityId, updates) {
     }
 
 
-    // 1. Filter Updates
-    const relevantKeys = ['title', 'type', 'private'];
-    const hasRelevantUpdates = Object.keys(updates).some(key => relevantKeys.includes(key));
-
-    if (!hasRelevantUpdates) {
-        logger.info({ stravaActivityId, updates }, 'No relevant updates found, skipping');
-        return;
-    }
+    // 1. Proceed with Update
+    // We used to filter by specific 'relevantKeys', but this skips updates for other fields
+    // and causes issues when forcing updates from backfills. We now proceed with the update.
+    logger.debug({ stravaActivityId }, 'Proceeding with calendar event update');
 
     // 2. Locate Event
     const calendarId = user.selectedCalendarId || 'primary';

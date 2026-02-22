@@ -129,16 +129,45 @@ async function testWebhook() {
     }
 }
 
+async function testHistoricalSync() {
+    const userIdInput = await askQuestion("Enter Strava Athlete ID to backfill [default: 12345]: ") || '12345';
+    const userId = parseInt(userIdInput, 10) || parseInt('12345', 10);
+
+    let daysInput = await askQuestion("Enter number of days back to sync (max 60) [default: 30]: ") || '30';
+    let days = parseInt(daysInput, 10) || 30;
+
+    if (days > 60) {
+        console.log("Days exceeded limit of 60. Clamping to 60.");
+        days = 60;
+    }
+
+    const payload = {
+        userId,
+        days
+    };
+
+    try {
+        console.log(`Sending historical sync request to local server (http://localhost:3000/admin/sync-fetch)...`);
+        const response = await axios.post('http://localhost:3000/admin/sync-fetch', payload);
+        console.log("\nHistorical sync triggered successfully:");
+        console.log(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+        console.error("Failed to trigger historical sync:");
+        console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    }
+}
+
 async function showMenu() {
     while (true) {
         console.log("\n--- Strava Webhooks Dev Script ---");
         console.log("1. List existing webhook setup");
         console.log("2. Create webhook destinations");
         console.log("3. Test the webhook with mock data");
-        console.log("4. Delete webhook destinations");
-        console.log("5. Exit");
+        console.log("4. Test historical fetch/sync (backfill)");
+        console.log("5. Delete webhook destinations");
+        console.log("6. Exit");
 
-        const answer = await askQuestion("\nChoose an option (1-5): ");
+        const answer = await askQuestion("\nChoose an option (1-6): ");
 
         switch (answer.trim()) {
             case '1':
@@ -151,9 +180,12 @@ async function showMenu() {
                 await testWebhook();
                 break;
             case '4':
-                await deleteSubscription();
+                await testHistoricalSync();
                 break;
             case '5':
+                await deleteSubscription();
+                break;
+            case '6':
                 console.log("Exiting.");
                 rl.close();
                 return;

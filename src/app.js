@@ -1,7 +1,5 @@
 const logger = require('./logger');
-const createFlow = require('./flows/create');
-const updateFlow = require('./flows/update');
-const deleteFlow = require('./flows/delete');
+const queueService = require('./services/queue');
 const authService = require('./services/auth');
 const googleCalendarService = require('./services/googleCalendar');
 const userRepository = require('./repositories/user-repository');
@@ -297,7 +295,29 @@ exports.handler = async (event) => {
             await userRepository.saveUser(user);
             return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ success: true, user }) };
         }
+        // POST /admin/sync-fetch
+        if (routeKey === 'POST /admin/sync-fetch') {
+            const { userId, days } = JSON.parse(body);
 
+            // Basic validation
+            if (!userId || !days || isNaN(days) || days <= 0) {
+                return { statusCode: 400, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: 'Invalid userId or days' }) };
+            }
+            if (days > 60) {
+                return { statusCode: 400, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: 'Days cannot exceed 60' }) };
+            }
+
+            // Verify user exists and is connected to Strava
+            const user = await userRepository.getUserByStravaAthleteId(userId.toString());
+            if (!user) {
+                return { statusCode: 404, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: 'User not found for given Strava ID' }) };
+            }
+
+            // Enqueue the job
+            await queueService.enqueueActivityFetch(userId, days);
+
+            return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ success: true, message: `Enqueued fetch for last ${days} days` }) };
+        }
 
         // --- Webhook Endpoints ---
 
@@ -339,13 +359,8 @@ exports.handler = async (event) => {
                 return { statusCode: 200, body: 'Ignored: User not found' };
             }
 
-            if (aspect_type === 'create') {
-                await createFlow.handleCreate(user, object_id);
-            } else if (aspect_type === 'update') {
-                await updateFlow.handleUpdate(user, object_id, updates);
-            } else if (aspect_type === 'delete') {
-                await deleteFlow.handleDelete(user, object_id);
-            }
+            // Enqueue the message to ActivitySyncQueue instead of processing it synchronously
+            await queueService.enqueueActivitySync(owner_id, object_id, aspect_type, updates);
 
             return { statusCode: 200, body: 'OK' };
         }

@@ -7,10 +7,12 @@
     "test": "jest",
     "deploy": "sam deploy",
     "local": "node scripts/local-server.js",
+    "local:mock": "node scripts/local-server.js --mock-db",
     "webhook-setup": "node scripts/strava-webhooks.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.980.0",
+    "@aws-sdk/client-sqs": "^3.995.0",
     "@aws-sdk/lib-dynamodb": "^3.980.0",
     "@react-oauth/google": "^0.13.4",
     "axios": "^1.13.4",

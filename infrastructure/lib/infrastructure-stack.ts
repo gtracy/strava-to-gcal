@@ -7,7 +7,27 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
+import * as fs from 'fs';
+
+// Attempt to load env.json securely at synth time
+const envPath = path.join(__dirname, '../../env.json');
+if (fs.existsSync(envPath)) {
+  const envConfig = JSON.parse(fs.readFileSync(envPath, 'utf8'));
+  let variables = envConfig;
+  if (envConfig.StravaSyncFunction) {
+    variables = envConfig.StravaSyncFunction;
+  } else {
+    const firstValue = Object.values(envConfig)[0];
+    if (typeof firstValue === 'object' && firstValue !== null) {
+      variables = firstValue as Record<string, string>;
+    }
+  }
+  Object.assign(process.env, variables);
+  console.log("Loaded environment variables from env.json for CDK synth.");
+}
 
 export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -103,11 +123,76 @@ export class InfrastructureStack extends cdk.Stack {
       integration: lambdaIntegration,
     });
 
-    // 4. Frontend S3 Bucket
+    // 4. Activity Fetch Queue and Worker
+    const activityFetchQueue = new sqs.Queue(this, 'ActivityFetchQueue', {
+      visibilityTimeout: cdk.Duration.seconds(300) // 5 minutes, give it time to fetch all pages
+    });
+
+    const activityFetchWorker = new NodejsFunction(this, 'ActivityFetchWorker', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../../src/workers/fetch-worker.js'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(300),
+      memorySize: 512,
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+        LOG_LEVEL: 'info',
+        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
+        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || ''
+      }
+    });
+
+    activityFetchWorker.addEventSource(new SqsEventSource(activityFetchQueue));
+
+    // 5. Activity Sync Queue and Worker
+    const activitySyncQueue = new sqs.Queue(this, 'ActivitySyncQueue', {
+      visibilityTimeout: cdk.Duration.seconds(60)
+    });
+
+    const activitySyncWorker = new NodejsFunction(this, 'ActivitySyncWorker', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../../src/workers/sync-worker.js'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+        LOG_LEVEL: 'info',
+        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
+        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || ''
+      }
+    });
+
+    activitySyncWorker.addEventSource(new SqsEventSource(activitySyncQueue));
+
+    // 6. Permissions and Routing
+
+    // Fetch Worker needs to read users and push to Sync Queue
+    usersTable.grantReadWriteData(activityFetchWorker);
+    activitySyncQueue.grantSendMessages(activityFetchWorker);
+    activityFetchWorker.addEnvironment('SYNC_QUEUE_URL', activitySyncQueue.queueUrl);
+
+    // Sync Worker needs to read users
+    usersTable.grantReadWriteData(activitySyncWorker);
+
+    // Existing App/Webhook Router needs to push to Sync Queue & Fetch Queue
+    activitySyncQueue.grantSendMessages(stravaSyncLambda);
+    stravaSyncLambda.addEnvironment('SYNC_QUEUE_URL', activitySyncQueue.queueUrl);
+    activityFetchQueue.grantSendMessages(stravaSyncLambda);
+    stravaSyncLambda.addEnvironment('FETCH_QUEUE_URL', activityFetchQueue.queueUrl);
+
+    // 7. Frontend S3 Bucket
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
       websiteIndexDocument: 'index.html',
       publicReadAccess: true,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS, // Modern S3 requires this to allow public read via policy
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: true,
+        blockPublicPolicy: false,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: false
+      }),
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true, // For dev convenience
     });

@@ -32,25 +32,32 @@ if (fs.existsSync(envPath)) {
 }
 
 // 2. Mock DynamoDB Client for Local Dev
-const ddbMock = mockClient(DynamoDBDocumentClient);
+const useMockDb = process.argv.includes('--mock-db');
 const localMemDb = new Map();
 
-ddbMock.on(PutCommand).callsFake((input) => {
-    localMemDb.set(input.Item.googleUserId, input.Item);
-    return {};
-});
+if (useMockDb) {
+    const ddbMock = mockClient(DynamoDBDocumentClient);
 
-ddbMock.on(GetCommand).callsFake((input) => {
-    const item = localMemDb.get(input.Key.googleUserId);
-    return { Item: item };
-});
+    ddbMock.on(PutCommand).callsFake((input) => {
+        localMemDb.set(input.Item.googleUserId, input.Item);
+        return {};
+    });
 
-ddbMock.on(QueryCommand).callsFake((input) => {
-    // Basic mock for StravaAthleteIndex
-    const stravaId = input.ExpressionAttributeValues[':stravaAthleteId'];
-    const items = Array.from(localMemDb.values()).filter(user => user.stravaAthleteId === stravaId);
-    return { Items: items };
-});
+    ddbMock.on(GetCommand).callsFake((input) => {
+        const item = localMemDb.get(input.Key.googleUserId);
+        return { Item: item };
+    });
+
+    ddbMock.on(QueryCommand).callsFake((input) => {
+        // Basic mock for StravaAthleteIndex
+        const stravaId = input.ExpressionAttributeValues[':stravaAthleteId'];
+        const items = Array.from(localMemDb.values()).filter(user => user.stravaAthleteId === stravaId);
+        return { Items: items };
+    });
+    console.log("🧪 Using Mock DynamoDB (Local Memory)");
+} else {
+    console.log("☁️  Using Remote AWS DynamoDB Table");
+}
 
 // 3. Require App (must happen AFTER env vars are loaded and mocks setup)
 const { handler } = require('../src/app');
@@ -115,5 +122,4 @@ const server = http.createServer(async (req, res) => {
 const PORT = 3000;
 server.listen(PORT, () => {
     console.log(`Local native server running at http://localhost:${PORT}`);
-    console.log(`Make sure your env.json contains: USERS_TABLE_NAME, GOOGLE_*, STRAVA_* credentials.`);
 });

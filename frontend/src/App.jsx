@@ -112,7 +112,7 @@ function App() {
     } catch (err) {
       console.error("Failed to fetch calendars", err);
       if (err.response?.status === 401 || err.response?.status === 404) {
-        handleLogout('Session expired. Please log in again.');
+        handleLogout();
       }
     }
   };
@@ -134,7 +134,7 @@ function App() {
     } catch (err) {
       console.error("Failed to create calendar", err);
       if (err.response?.status === 401 || err.response?.status === 404) {
-        handleLogout('Session expired. Please log in again.');
+        handleLogout();
         return;
       }
       const errorMsg = err.response?.data?.error || 'Failed to create calendar';
@@ -167,7 +167,7 @@ function App() {
     } catch (err) {
       console.error("Failed to update calendar preference", err);
       if (err.response?.status === 401) {
-        handleLogout('Session expired. Please log in again.');
+        handleLogout();
         return;
       }
       const errorMsg = err.response?.data?.error || 'Failed to save calendar preference';
@@ -196,7 +196,7 @@ function App() {
     } catch (err) {
       console.error("Strava Connection Error", err);
       if (err.response?.status === 401) {
-        handleLogout('Session expired. Please log in again.');
+        handleLogout();
         return;
       }
       const errorMsg = err.response?.data?.error || 'Strava Connection Failed';
