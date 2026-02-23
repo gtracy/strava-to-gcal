@@ -5,6 +5,7 @@ const axios = require('axios');
 
 // Load environment variables
 const envPath = path.join(__dirname, '..', 'env.json');
+let envVerifyToken = null;
 if (fs.existsSync(envPath)) {
     const envConfig = JSON.parse(fs.readFileSync(envPath));
     let variables = envConfig;
@@ -17,13 +18,14 @@ if (fs.existsSync(envPath)) {
         }
     }
     Object.assign(process.env, variables);
+    envVerifyToken = variables.STRAVA_VERIFY_TOKEN;
 } else {
     console.warn("Warning: env.json not found. Environment variables might be missing.");
 }
 
 const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID;
 const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
-const STRAVA_VERIFY_TOKEN = process.env.STRAVA_VERIFY_TOKEN || 'local-dev-verify-token';
+const STRAVA_VERIFY_TOKEN = envVerifyToken || process.env.STRAVA_VERIFY_TOKEN || 'missing-verify-token';
 
 if (!STRAVA_CLIENT_ID || !STRAVA_CLIENT_SECRET) {
     console.error("Error: STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET must be set in env.json");
@@ -85,17 +87,26 @@ async function deleteSubscription() {
     }
 
     try {
-        console.log(`Deleting subscription ${subscriptionId}...`);
-        await axios.delete(`https://www.strava.com/api/v3/push_subscriptions/${subscriptionId}`, {
-            data: {
-                client_id: STRAVA_CLIENT_ID,
-                client_secret: STRAVA_CLIENT_SECRET
-            }
-        });
+        const id = parseInt(subscriptionId, 10);
+        console.log(`Deleting subscription ${id}...`);
+        const url = `https://www.strava.com/api/v3/push_subscriptions/${id}`;
+        const params = {
+            client_id: parseInt(STRAVA_CLIENT_ID, 10),
+            client_secret: STRAVA_CLIENT_SECRET
+        };
+        console.log(`URL: ${url}`);
+        console.log(`Params: ${JSON.stringify(params)}`);
+
+        await axios.delete(url, { params });
         console.log("\nSubscription deleted successfully.");
     } catch (error) {
         console.error("Failed to delete subscription:");
-        console.error(error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+        if (error.response) {
+            console.error(`Status: ${error.response.status}`);
+            console.error(JSON.stringify(error.response.data, null, 2));
+        } else {
+            console.error(error.message);
+        }
     }
 }
 

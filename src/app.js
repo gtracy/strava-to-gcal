@@ -323,6 +323,7 @@ exports.handler = async (event) => {
 
         // GET /webhook - Verification
         if (routeKey === 'GET /webhook') {
+            logger.info('Webhook verification endpoint reached v1.1 - deploy fix');
             const params = new URLSearchParams(rawQueryString);
             const challenge = params.get('hub.challenge');
             const verifyToken = params.get('hub.verify_token');
@@ -330,19 +331,19 @@ exports.handler = async (event) => {
 
             if (mode && verifyToken) {
                 if (mode === 'subscribe' && verifyToken === process.env.STRAVA_VERIFY_TOKEN) {
-                    logger.info('Verifying webhook subscription');
+                    logger.info('Webhook subscription verified!');
                     return {
                         statusCode: 200,
                         body: JSON.stringify({ "hub.challenge": challenge })
                     };
                 } else {
-                    logger.warn({ mode, verifyToken }, 'Webhook verification failed: token or mode mismatch');
+                    logger.error({ mode, verifyToken }, 'Webhook verification failed: token or mode mismatch');
                     return { statusCode: 403, body: 'Forbidden' };
                 }
+            } else {
+                logger.error({ params: rawQueryString }, 'Webhook Verification failed: missing mode or verify_token');
+                return { statusCode: 403, body: 'Forbidden' };
             }
-
-            logger.debug({ payload: rawQueryString, body }, 'Webhook reached without verification params');
-            return { statusCode: 200, body: 'OK' };
         }
 
         // POST /webhook - Event ingestion

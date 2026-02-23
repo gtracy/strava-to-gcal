@@ -33,14 +33,14 @@ describe('Webhook Endpoints', () => {
             expect(response.body).toBe("Forbidden");
         });
 
-        it('should return 200 (OK) for requests without verification params', async () => {
+        it('should return 403 (Forbidden) for requests without verification params', async () => {
             const event = {
                 routeKey: 'GET /webhook',
                 rawQueryString: 'foo=bar'
             };
             const response = await app.handler(event);
-            expect(response.statusCode).toBe(200);
-            expect(response.body).toBe("OK");
+            expect(response.statusCode).toBe(403);
+            expect(response.body).toBe("Forbidden");
         });
     });
 
