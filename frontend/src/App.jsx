@@ -4,11 +4,11 @@ import { useGoogleLogin } from '@react-oauth/google'
 import axios from 'axios'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL;
-const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
-const REDIRECT_URI = window.location.origin;
+function App({ dynamicConfig }) {
+  const API_URL = dynamicConfig?.VITE_API_URL || import.meta.env.VITE_API_URL;
+  const STRAVA_CLIENT_ID = dynamicConfig?.VITE_STRAVA_CLIENT_ID || import.meta.env.VITE_STRAVA_CLIENT_ID;
+  const REDIRECT_URI = window.location.origin;
 
-function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ text: '', type: 'error' }); // type: 'error' | 'success'

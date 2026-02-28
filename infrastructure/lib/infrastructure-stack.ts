@@ -11,6 +11,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 
 // Attempt to load env.json securely at synth time
 const envPath = path.join(__dirname, '../../env.json');
@@ -196,6 +197,23 @@ export class InfrastructureStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true, // For dev convenience
     });
+
+    // 8. Deploy Frontend Assets and Dynamic Config
+    const deployment = new s3deploy.BucketDeployment(this, 'DeployFrontendWithConfig', {
+      sources: [
+        s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist')),
+        s3deploy.Source.jsonData('config.json', {
+          VITE_API_URL: httpApi.apiEndpoint,
+          VITE_GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+          VITE_STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || ''
+        })
+      ],
+      destinationBucket: frontendBucket,
+      prune: false,
+    });
+
+    // Ensure the API exists before we try to extract its endpoint
+    deployment.node.addDependency(httpApi);
 
     // Outputs
     new cdk.CfnOutput(this, 'ApiUrl', {

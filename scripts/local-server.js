@@ -96,6 +96,18 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
 
+            if (req.method === 'GET' && url.pathname === '/config.json') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.end(JSON.stringify({
+                    VITE_API_URL: `http://localhost:3000`,
+                    VITE_GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+                    VITE_STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID
+                }));
+                return;
+            }
+
             const result = await handler(event);
 
             res.statusCode = result.statusCode || 200;

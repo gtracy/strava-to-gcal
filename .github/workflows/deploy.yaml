@@ -34,6 +34,12 @@ jobs:
       - name: Install Infrastructure Dependencies
         run: cd infrastructure && npm ci
 
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm ci
+          VITE_API_URL="https://k4dmjeu8o4.execute-api.us-east-2.amazonaws.com" npm run build
+
       # Deploy
       - name: Deploy Infrastructure via CDK
         run: cd infrastructure && cdk deploy --require-approval never

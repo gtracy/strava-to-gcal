@@ -5,7 +5,8 @@
   "main": "src/app.js",
   "scripts": {
     "test": "jest",
-    "deploy": "cd infrastructure && npx cdk deploy --require-approval never",
+    "deploy": "npm run build:frontend && cd infrastructure && npx cdk deploy",
+    "build:frontend": "cd frontend && npm run build",
     "local": "node scripts/local-server.js",
     "local:mock": "node scripts/local-server.js --mock-db",
     "webhook-setup": "node scripts/strava-webhooks.js"
