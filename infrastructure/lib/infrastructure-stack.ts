@@ -6,7 +6,6 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -64,7 +63,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 2. Lambda Function
     const stravaSyncLambda = new NodejsFunction(this, 'StravaSyncFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../../src/app.js'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(30),
@@ -146,7 +145,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     const activityFetchWorker = new NodejsFunction(this, 'ActivityFetchWorker', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../../src/workers/fetch-worker.js'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(300),
@@ -170,7 +169,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     const activitySyncWorker = new NodejsFunction(this, 'ActivitySyncWorker', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../../src/workers/sync-worker.js'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(60),
