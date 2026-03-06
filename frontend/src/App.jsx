@@ -504,11 +504,6 @@ function App({ dynamicConfig }) {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <button className="btn-outline fade-in-up" onClick={() => handleLogout()} style={{ animationDelay: '0.6s' }}>
-              Sign Out
-            </button>
-          </div>
         </div>
       )}
     </div>
