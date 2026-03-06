@@ -8,6 +8,8 @@ import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as kms from 'aws-cdk-lib/aws-kms';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -47,6 +49,19 @@ export class InfrastructureStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // 1.5 Security: KMS and Secrets Manager
+    const kmsKey = new kms.Key(this, 'TokenKey', {
+      alias: 'alias/StravaToGcalTokens',
+      description: 'Key for encrypting user tokens in DynamoDB',
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev
+    });
+
+    const appSecrets = new secretsmanager.Secret(this, 'AppSecrets', {
+      secretName: 'StravaToGcalAppSecrets',
+      description: 'Application secrets for Strava to Google Calendar sync',
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev
+    });
+
     // 2. Lambda Function
     const stravaSyncLambda = new NodejsFunction(this, 'StravaSyncFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -57,16 +72,17 @@ export class InfrastructureStack extends cdk.Stack {
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
-        // These will be injected at deploy time or via AWS Secrets Manager in a real setup
-        // But for parity with the template.yaml, we'll leave placeholders or expect them in the environment
-        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
-        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
+        KMS_KEY_ID: kmsKey.keyId,
+        SECRETS_NAME: appSecrets.secretName,
+        // Fallbacks for local environment compatibility if needed
         STRAVA_VERIFY_TOKEN: process.env.STRAVA_VERIFY_TOKEN || 'strava-verify-token-fallback',
-        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
-        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
         JWT_SECRET: process.env.JWT_SECRET || 'fallback-secret-for-cdk-synth'
       },
     });
+
+    // Permissions
+    kmsKey.grantEncryptDecrypt(stravaSyncLambda);
+    appSecrets.grantRead(stravaSyncLambda);
 
     // Grant Lambda permissions to DynamoDB Table
     usersTable.grantReadWriteData(stravaSyncLambda);
@@ -138,10 +154,13 @@ export class InfrastructureStack extends cdk.Stack {
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
-        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
-        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || ''
+        KMS_KEY_ID: kmsKey.keyId,
+        SECRETS_NAME: appSecrets.secretName
       }
     });
+
+    kmsKey.grantEncryptDecrypt(activityFetchWorker);
+    appSecrets.grantRead(activityFetchWorker);
 
     activityFetchWorker.addEventSource(new SqsEventSource(activityFetchQueue));
 
@@ -159,12 +178,13 @@ export class InfrastructureStack extends cdk.Stack {
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
-        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
-        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
-        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
-        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || ''
+        KMS_KEY_ID: kmsKey.keyId,
+        SECRETS_NAME: appSecrets.secretName
       }
     });
+
+    kmsKey.grantEncryptDecrypt(activitySyncWorker);
+    appSecrets.grantRead(activitySyncWorker);
 
     activitySyncWorker.addEventSource(new SqsEventSource(activitySyncQueue));
 

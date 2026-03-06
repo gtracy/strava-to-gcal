@@ -86,4 +86,31 @@ describe('Auth Endpoints', () => {
         const response = await app.handler(event);
         expect(response.statusCode).toBe(401);
     });
+
+    it('DELETE /user should revoke tokens and delete user', async () => {
+        const token = jwt.sign({ googleUserId: '12345' }, 'test-secret');
+        userRepository.getUserByGoogleId.mockResolvedValue({
+            googleUserId: '12345',
+            googleRefreshToken: 'google_refresh',
+            stravaAccessToken: 'strava_access'
+        });
+        authService.revokeGoogleToken.mockResolvedValue();
+        authService.revokeStravaToken.mockResolvedValue();
+        userRepository.deleteUser.mockResolvedValue(true);
+
+        const event = {
+            routeKey: 'DELETE /user',
+            headers: {
+                authorization: `Bearer ${token}`
+            }
+        };
+
+        const response = await app.handler(event);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).success).toBe(true);
+
+        expect(authService.revokeGoogleToken).toHaveBeenCalledWith('google_refresh');
+        expect(authService.revokeStravaToken).toHaveBeenCalledWith('strava_access');
+        expect(userRepository.deleteUser).toHaveBeenCalledWith('12345');
+    });
 });

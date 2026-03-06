@@ -1,22 +1,34 @@
 const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
 const logger = require('../logger');
+const config = require('../config');
 
 class AuthService {
     constructor() {
+        this.googleClient = null;
+    }
+
+    async _getGoogleClient() {
+        if (this.googleClient) return this.googleClient;
+        const googleConfig = await config.getGoogle();
         this.googleClient = new OAuth2Client(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET
+            googleConfig.clientId,
+            googleConfig.clientSecret
         );
-        this.stravaClientId = process.env.STRAVA_CLIENT_ID;
-        this.stravaClientSecret = process.env.STRAVA_CLIENT_SECRET;
+        return this.googleClient;
+    }
+
+    async _getStravaConfig() {
+        return config.getStrava();
     }
 
     async verifyGoogleToken(idToken) {
         try {
-            const ticket = await this.googleClient.verifyIdToken({
+            const client = await this._getGoogleClient();
+            const googleConfig = await config.getGoogle();
+            const ticket = await client.verifyIdToken({
                 idToken: idToken,
-                audience: process.env.GOOGLE_CLIENT_ID,
+                audience: googleConfig.clientId,
             });
             const payload = ticket.getPayload();
             logger.debug({ sub: payload.sub, email: payload.email }, 'Verified Google ID Token');
@@ -29,7 +41,8 @@ class AuthService {
 
     async exchangeGoogleCode(code, redirectUri) {
         try {
-            const { tokens } = await this.googleClient.getToken({
+            const client = await this._getGoogleClient();
+            const { tokens } = await client.getToken({
                 code,
                 redirect_uri: redirectUri
             });
@@ -41,10 +54,11 @@ class AuthService {
     }
 
     async exchangeStravaCode(code) {
+        const stravaConfig = await this._getStravaConfig();
         try {
             const response = await axios.post('https://www.strava.com/oauth/token', {
-                client_id: this.stravaClientId,
-                client_secret: this.stravaClientSecret,
+                client_id: stravaConfig.clientId,
+                client_secret: stravaConfig.clientSecret,
                 code: code,
                 grant_type: 'authorization_code'
             });
@@ -63,18 +77,20 @@ class AuthService {
 
     // Refresh Google Token if needed
     async refreshGoogleToken(refreshToken) {
-        this.googleClient.setCredentials({
+        const client = await this._getGoogleClient();
+        client.setCredentials({
             refresh_token: refreshToken
         });
-        const { credentials } = await this.googleClient.refreshAccessToken();
+        const { credentials } = await client.refreshAccessToken();
         return credentials;
     }
 
     async refreshStravaToken(refreshToken) {
+        const stravaConfig = await this._getStravaConfig();
         try {
             const response = await axios.post('https://www.strava.com/oauth/token', {
-                client_id: this.stravaClientId,
-                client_secret: this.stravaClientSecret,
+                client_id: stravaConfig.clientId,
+                client_secret: stravaConfig.clientSecret,
                 refresh_token: refreshToken,
                 grant_type: 'refresh_token'
             });
@@ -88,6 +104,28 @@ class AuthService {
 
             logger.error({ ...errorDetails }, 'Error refreshing Strava Token');
             throw error;
+        }
+    }
+
+    async revokeGoogleToken(token) {
+        try {
+            await axios.post(`https://oauth2.googleapis.com/revoke?token=${token}`, null, {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            });
+            logger.info('Successfully revoked Google token');
+        } catch (error) {
+            logger.warn({ err: error.message }, 'Google token revocation failed or token already invalid');
+        }
+    }
+
+    async revokeStravaToken(token) {
+        try {
+            await axios.post('https://www.strava.com/oauth/deauthorize', {
+                access_token: token
+            });
+            logger.info('Successfully revoked Strava access');
+        } catch (error) {
+            logger.warn({ err: error.message }, 'Strava deauthorization failed or token already invalid');
         }
     }
 }

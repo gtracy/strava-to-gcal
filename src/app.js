@@ -1,17 +1,21 @@
+const { google } = require('googleapis');
+const jwt = require('jsonwebtoken');
+const config = require('./config');
 const logger = require('./logger');
 const queueService = require('./services/queue');
 const authService = require('./services/auth');
 const googleCalendarService = require('./services/googleCalendar');
 const userRepository = require('./repositories/user-repository');
-const { google } = require('googleapis');
-const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
+const getJwtSecret = async () => {
+    return await config.getJwtSecret() || process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
+};
 
-const verifySession = (headers) => {
+const verifySession = async (headers) => {
     if (!headers || !headers.authorization) throw new Error('Missing Authorization');
     const token = headers.authorization.split(' ')[1];
-    return jwt.verify(token, JWT_SECRET).googleUserId;
+    const secret = await getJwtSecret();
+    return jwt.verify(token, secret).googleUserId;
 };
 
 const handleError = (error, context = {}) => {
@@ -86,6 +90,9 @@ exports.handler = async (event) => {
                 user = { googleUserId, email };
             }
 
+            user.name = payload.name;
+            user.firstName = payload.given_name;
+
             user.googleAccessToken = tokens.access_token;
             if (tokens.refresh_token) {
                 user.googleRefreshToken = tokens.refresh_token;
@@ -95,12 +102,13 @@ exports.handler = async (event) => {
             await userRepository.saveUser(user);
             logger.info({ googleUserId }, 'User authenticated with Google');
 
-            const token = jwt.sign({ googleUserId }, JWT_SECRET, { expiresIn: '1d' });
+            const secret = await getJwtSecret();
+            const token = jwt.sign({ googleUserId }, secret, { expiresIn: '1d' });
 
             return {
                 statusCode: 200,
                 headers: { "Access-Control-Allow-Origin": "*" },
-                body: JSON.stringify({ user: { googleUserId, email, hasStrava: !!user.stravaAthleteId, selectedCalendarId: user.selectedCalendarId, metricPreference: user.metricPreference }, token })
+                body: JSON.stringify({ user: { googleUserId, email, name: user.name, firstName: user.firstName, hasStrava: !!user.stravaAthleteId, selectedCalendarId: user.selectedCalendarId, metricPreference: user.metricPreference }, token })
             };
         }
 
@@ -110,7 +118,7 @@ exports.handler = async (event) => {
 
             let authorizedGoogleId;
             try {
-                authorizedGoogleId = verifySession(headers);
+                authorizedGoogleId = await verifySession(headers);
             } catch (e) {
                 const err = new Error('Unauthorized');
                 err.statusCode = 401;
@@ -157,7 +165,7 @@ exports.handler = async (event) => {
         if (routeKey === 'GET /user/status') {
             let googleUserId;
             try {
-                googleUserId = verifySession(headers);
+                googleUserId = await verifySession(headers);
             } catch (e) {
                 const err = new Error('Unauthorized');
                 err.statusCode = 401;
@@ -171,6 +179,9 @@ exports.handler = async (event) => {
                 body: JSON.stringify({
                     connected: !!user?.stravaAthleteId,
                     googleUserId,
+                    email: user?.email,
+                    name: user?.name,
+                    firstName: user?.firstName,
                     selectedCalendarId: user?.selectedCalendarId || 'primary',
                     metricPreference: user?.metricPreference || null
                 })
@@ -181,7 +192,7 @@ exports.handler = async (event) => {
         if (routeKey === 'GET /user/calendars') {
             let googleUserId;
             try {
-                googleUserId = verifySession(headers);
+                googleUserId = await verifySession(headers);
             } catch (e) {
                 const err = new Error('Unauthorized');
                 err.statusCode = 401;
@@ -205,9 +216,10 @@ exports.handler = async (event) => {
                 throw err;
             }
 
+            const googleConfig = await config.getGoogle();
             const googleAuthClient = new google.auth.OAuth2(
-                process.env.GOOGLE_CLIENT_ID,
-                process.env.GOOGLE_CLIENT_SECRET
+                googleConfig.clientId,
+                googleConfig.clientSecret
             );
             googleAuthClient.setCredentials(googleCredentials);
 
@@ -219,7 +231,7 @@ exports.handler = async (event) => {
         if (routeKey === 'POST /user/calendars/strava') {
             let googleUserId;
             try {
-                googleUserId = verifySession(headers);
+                googleUserId = await verifySession(headers);
             } catch (e) {
                 const err = new Error('Unauthorized');
                 err.statusCode = 401;
@@ -243,9 +255,10 @@ exports.handler = async (event) => {
                 throw err;
             }
 
+            const googleConfig = await config.getGoogle();
             const googleAuthClient = new google.auth.OAuth2(
-                process.env.GOOGLE_CLIENT_ID,
-                process.env.GOOGLE_CLIENT_SECRET
+                googleConfig.clientId,
+                googleConfig.clientSecret
             );
             googleAuthClient.setCredentials(googleCredentials);
 
@@ -270,7 +283,7 @@ exports.handler = async (event) => {
         if (routeKey === 'PATCH /user') {
             let googleUserId;
             try {
-                googleUserId = verifySession(headers);
+                googleUserId = await verifySession(headers);
             } catch (e) {
                 const err = new Error('Unauthorized');
                 err.statusCode = 401;
@@ -294,6 +307,50 @@ exports.handler = async (event) => {
 
             await userRepository.saveUser(user);
             return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ success: true, user }) };
+        }
+
+        // DELETE /user
+        if (routeKey === 'DELETE /user') {
+            let googleUserId;
+            try {
+                googleUserId = await verifySession(headers);
+            } catch (e) {
+                const err = new Error('Unauthorized');
+                err.statusCode = 401;
+                throw err;
+            }
+
+            const user = await userRepository.getUserByGoogleId(googleUserId);
+            if (!user) {
+                const err = new Error('User not found');
+                err.statusCode = 404;
+                throw err;
+            }
+
+            // Concurrently revoke tokens
+            const revocations = [];
+            if (user.googleRefreshToken) {
+                revocations.push(authService.revokeGoogleToken(user.googleRefreshToken));
+            } else if (user.googleAccessToken) {
+                revocations.push(authService.revokeGoogleToken(user.googleAccessToken));
+            }
+
+            if (user.stravaAccessToken) {
+                revocations.push(authService.revokeStravaToken(user.stravaAccessToken));
+            }
+
+            await Promise.allSettled(revocations);
+
+            // Delete User Record
+            await userRepository.deleteUser(googleUserId);
+
+            logger.info({ googleUserId }, 'User account deleted and access revoked');
+
+            return {
+                statusCode: 200,
+                headers: { "Access-Control-Allow-Origin": "*" },
+                body: JSON.stringify({ success: true, message: 'Account deleted successfully' })
+            };
         }
         // POST /admin/sync-fetch
         if (routeKey === 'POST /admin/sync-fetch') {

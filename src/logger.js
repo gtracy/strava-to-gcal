@@ -1,8 +1,7 @@
 const pino = require('pino');
-const config = require('./config');
 
 const logger = pino({
-    level: config.logLevel,
+    level: process.env.LOG_LEVEL || 'info',
     serializers: {
         err: pino.stdSerializers.err,
         req: pino.stdSerializers.req,
