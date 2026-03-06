@@ -14,6 +14,9 @@ function App({ dynamicConfig }) {
   const [msg, setMsg] = useState({ text: '', type: 'error' }); // type: 'error' | 'success'
   const [calendars, setCalendars] = useState([]);
   const [isEditingCalendar, setIsEditingCalendar] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
   const showMessage = (text, type = 'error') => {
     setMsg({ text, type });
@@ -149,6 +152,28 @@ function App({ dynamicConfig }) {
     localStorage.removeItem('strava_gcal_user');
     localStorage.removeItem('strava_gcal_token');
     if (message) showMessage(message);
+    setDeleteConfirmed(false);
+    setShowDeleteModal(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteConfirmed) return;
+    setIsDeleting(true);
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('strava_gcal_token');
+      await axios.delete(`${API_URL}/user`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      handleLogout('Account deleted successfully. All data has been removed.');
+    } catch (err) {
+      console.error("Failed to delete account", err);
+      const errorMsg = err.response?.data?.error || 'Failed to delete account';
+      showMessage(errorMsg);
+    } finally {
+      setIsDeleting(false);
+      setLoading(false);
+    }
   };
 
   const handleCalendarChange = async (e) => {
@@ -401,8 +426,86 @@ function App({ dynamicConfig }) {
             )}
           </div>
 
+          {user.hasStrava && (
+            <div className="card-item fade-in-up" style={{ animationDelay: '0.5s', marginTop: '2rem', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.03)' }}>
+              {!showDeleteModal ? (
+                <>
+                  <div className="icon" style={{ color: 'var(--accent-color)' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  </div>
+                  <div className="status-text">
+                    <span className="status-title">Everything is set!</span>
+                    <span className="status-desc" style={{ fontSize: '0.95rem', lineHeight: '1.4' }}>
+                      Hello, {user.firstName || 'there'}. You are all setup! Data will flow seamlessly in the background and there's nothing left for you to do.
+                    </span>
+
+                    <div style={{ marginTop: '1rem', paddingLeft: '0.5rem' }}>
+                      <button
+                        className="btn-text"
+                        style={{ fontSize: '0.875rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: 0, backgroundColor: 'transparent', border: 'none' }}
+                        onClick={() => setShowDeleteModal(true)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c-.6 0-1.1.2-1.5.5L8.6 5.6C9.6 4.6 10.7 4.1 12 4c5.5 0 10 4.5 10 10 0 1.3-.3 2.5-1 3.5l-1.5-1.5c.3-.6.5-1.3.5-2 0-4.4-3.6-8-8-8zm4.4 12.3-1.4-1.4c-.9.7-1.9 1.1-3 1.1-4.4 0-8-3.6-8-8 0-1.1.4-2.1 1.1-3l-1.4-1.4C2.7 8.1 2 9.9 2 12c0 5.5 4.5 10 10 10 2.1 0 3.9-.7 5.4-1.7zM13 12.8V9c0-.6-.4-1-1-1s-1 .4-1 1v3.8l2 2zM3 2.3 1.7 3.6l19 19 1.3-1.3-19-19z" /></svg>
+                        Disconnect all services
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="status-text fade-in" style={{ width: '100%' }}>
+                  <span className="status-title" style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Sorry to see you go, {user.firstName || 'there'}!</span>
+                  <span className="status-desc" style={{ fontSize: '0.95rem', marginBottom: '1rem', display: 'block' }}>
+                    Here's what will happen next when you delete your account:
+                  </span>
+
+                  <div className="status-desc" style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.8rem', fontSize: '0.9rem', opacity: 0.8 }}>
+                    <div>🚫 Our access to your Google Calendar will be revoked.</div>
+                    <div>🚫 Our access to your Strava account will be revoked.</div>
+                    <div>🧹 All of your calendar and Strava synchronization settings will be deleted.</div>
+                    <div>📌 We won't touch your existing calendar events. They will remain on your calendar.</div>
+                  </div>
+
+                  <label className="checkbox-container" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={deleteConfirmed}
+                      onChange={(e) => setDeleteConfirmed(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <span className="status-desc" style={{ fontSize: '0.85rem' }}>I want to permanently delete my account.</span>
+                  </label>
+
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-start' }}>
+                    <button
+                      className="btn-outline"
+                      style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                      onClick={() => setShowDeleteModal(false)}
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="btn-strava"
+                      style={{
+                        fontSize: '0.85rem',
+                        padding: '0.5rem 1rem',
+                        backgroundColor: deleteConfirmed ? '#555' : '#333',
+                        borderColor: deleteConfirmed ? '#555' : '#333',
+                        opacity: deleteConfirmed ? 1 : 0.5
+                      }}
+                      disabled={!deleteConfirmed || isDeleting}
+                      onClick={handleDeleteAccount}
+                    >
+                      {isDeleting ? 'Processing...' : 'Confirm Disconnect'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <button className="btn-outline fade-in-up" onClick={() => handleLogout()} style={{ animationDelay: '0.5s' }}>
+            <button className="btn-outline fade-in-up" onClick={() => handleLogout()} style={{ animationDelay: '0.6s' }}>
               Sign Out
             </button>
           </div>
