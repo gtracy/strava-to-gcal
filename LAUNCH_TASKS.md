@@ -17,7 +17,7 @@ This document outlines the required activities to transition the current persona
   - Set up CloudFront with OAC (Origin Access Control) for the frontend S3 bucket instead of public S3 access (better security).
   - Set up API Gateway Custom Domain with ACM certificates for the API endpoints.
 - [ ] **API Rate Limiting:** Configure API Gateway Usage Plans or standard rate limiting to prevent abuse on authentication and webhook endpoints.
-- [ ] **CloudWatch Monitoring & Alarms:** Set up basic alarms for Lambda error rates and DLQ message counts, connected to an SNS topic that emails the administrator.
+- [x] **CloudWatch Monitoring & Alarms:** Set up basic alarms for Lambda error rates and DLQ message counts, connected to an SNS topic that emails the administrator.
 
 ## 3. Application Resiliency & Error Handling
 - [ ] **Token Revocation Handling:** Ensure the application gracefully handles user token revocation (e.g., if a user revokes access via Google or Strava, mark the user state as "disconnected" instead of continually failing background jobs).

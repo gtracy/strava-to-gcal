@@ -147,6 +147,31 @@ export class InfrastructureStack extends cdk.Stack {
       integration: lambdaIntegration,
     });
 
+    // --- APIGW METRICS ---
+    const apigwMetrics = {
+      count: new cloudwatch.Metric({
+        namespace: 'AWS/ApiGateway',
+        metricName: 'Count',
+        dimensionsMap: { ApiId: httpApi.apiId },
+        statistic: cloudwatch.Stats.SUM,
+        period: cdk.Duration.minutes(1),
+      }),
+      error4xx: new cloudwatch.Metric({
+        namespace: 'AWS/ApiGateway',
+        metricName: '4XXError',
+        dimensionsMap: { ApiId: httpApi.apiId },
+        statistic: cloudwatch.Stats.SUM,
+        period: cdk.Duration.minutes(1),
+      }),
+      error5xx: new cloudwatch.Metric({
+        namespace: 'AWS/ApiGateway',
+        metricName: '5XXError',
+        dimensionsMap: { ApiId: httpApi.apiId },
+        statistic: cloudwatch.Stats.SUM,
+        period: cdk.Duration.minutes(1),
+      })
+    };
+
     // 3.5 Monitoring & Dead Letter Queues
     const alertsTopic = new sns.Topic(this, 'AlertsTopic', {
       topicName: 'StravaGcal-AlertsTopic',
@@ -183,6 +208,30 @@ export class InfrastructureStack extends cdk.Stack {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
     });
     syncAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
+
+    // --- APP-LEVEL ERRORS METRIC FILTER ---
+    const appErrorMetricName = 'AppErrors';
+    const appErrorMetricNamespace = 'StravaGcal/Application';
+
+    const appErrorMetric = new cloudwatch.Metric({
+      namespace: appErrorMetricNamespace,
+      metricName: appErrorMetricName,
+      statistic: cloudwatch.Stats.SUM,
+      period: cdk.Duration.minutes(5),
+    });
+
+    // We will attach the metric filter to the log groups of all three Lambdas later
+    // once the workers are instantiated below.
+
+    const appErrorAlarm = new cloudwatch.Alarm(this, 'AppErrorAlarm', {
+      alarmName: 'StravaGcal-AppError-Alarm',
+      metric: appErrorMetric,
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    appErrorAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
 
     // 4. Activity Fetch Queue and Worker
     const activityFetchQueue = new sqs.Queue(this, 'ActivityFetchQueue', {
@@ -267,8 +316,87 @@ export class InfrastructureStack extends cdk.Stack {
     // Existing App/Webhook Router needs to push to Sync Queue & Fetch Queue
     activitySyncQueue.grantSendMessages(stravaSyncLambda);
     stravaSyncLambda.addEnvironment('SYNC_QUEUE_URL', activitySyncQueue.queueUrl);
-    activityFetchQueue.grantSendMessages(stravaSyncLambda);
-    stravaSyncLambda.addEnvironment('FETCH_QUEUE_URL', activityFetchQueue.queueUrl);
+    // Enable metric filters on Log Groups
+    // We have to specify the default CDK log group names since we used logRetention on the functions
+    const attachMetricFilter = (lambdaFn: NodejsFunction, id: string) => {
+      new logs.MetricFilter(this, id, {
+        logGroup: lambdaFn.logGroup,
+        metricNamespace: appErrorMetricNamespace,
+        metricName: appErrorMetricName,
+        filterPattern: logs.FilterPattern.stringValue('$.level', '=', '50'),
+        metricValue: '1',
+      });
+    };
+
+    attachMetricFilter(stravaSyncLambda, 'ApiHandlerErrorFilter');
+    attachMetricFilter(activityFetchWorker, 'FetchWorkerErrorFilter');
+    attachMetricFilter(activitySyncWorker, 'SyncWorkerErrorFilter');
+
+    // --- CLOUDWATCH DASHBOARD ---
+    const dashboard = new cloudwatch.Dashboard(this, 'StravaGcalDashboard', {
+      dashboardName: 'StravaGcal-Monitoring'
+    });
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway HTTP Requests',
+        left: [apigwMetrics.count],
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway HTTP Errors',
+        left: [apigwMetrics.error4xx, apigwMetrics.error5xx],
+        width: 12
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Application Errors (Pino Level 50)',
+        left: [appErrorMetric],
+        width: 12
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Dead Letter Queues (Failed Jobs)',
+        metrics: [
+          activityFetchDLQ.metricApproximateNumberOfMessagesVisible({ label: 'Fetch DLQ' }),
+          activitySyncDLQ.metricApproximateNumberOfMessagesVisible({ label: 'Sync DLQ' })
+        ],
+        width: 12
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'SQS Backlog (Messages Waiting)',
+        left: [
+          activityFetchQueue.metricApproximateNumberOfMessagesVisible({ label: 'Fetch Queue' }),
+          activitySyncQueue.metricApproximateNumberOfMessagesVisible({ label: 'Sync Queue' })
+        ],
+        width: 24
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Invocations',
+        left: [
+          stravaSyncLambda.metricInvocations({ label: 'API Handler' }),
+          activityFetchWorker.metricInvocations({ label: 'Fetch Worker' }),
+          activitySyncWorker.metricInvocations({ label: 'Sync Worker' })
+        ],
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Errors',
+        left: [
+          stravaSyncLambda.metricErrors({ label: 'API Handler' }),
+          activityFetchWorker.metricErrors({ label: 'Fetch Worker' }),
+          activitySyncWorker.metricErrors({ label: 'Sync Worker' })
+        ],
+        width: 12
+      })
+    );
 
     // 7. Frontend S3 Bucket
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
