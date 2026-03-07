@@ -51,7 +51,7 @@ describe('Webhook Endpoints', () => {
 
             const event = {
                 routeKey: 'POST /webhook',
-                body: JSON.stringify({ aspect_type: 'create', object_id: 'abc', owner_id: '123' })
+                body: JSON.stringify({ object_type: 'activity', aspect_type: 'create', object_id: 'abc', owner_id: '123' })
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
@@ -64,7 +64,7 @@ describe('Webhook Endpoints', () => {
 
             const event = {
                 routeKey: 'POST /webhook',
-                body: JSON.stringify({ aspect_type: 'update', object_id: 'abc', owner_id: '123', updates: { title: 'new' } })
+                body: JSON.stringify({ object_type: 'activity', aspect_type: 'update', object_id: 'abc', owner_id: '123', updates: { title: 'new' } })
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
@@ -77,7 +77,7 @@ describe('Webhook Endpoints', () => {
 
             const event = {
                 routeKey: 'POST /webhook',
-                body: JSON.stringify({ aspect_type: 'delete', object_id: 'abc', owner_id: '123' })
+                body: JSON.stringify({ object_type: 'activity', aspect_type: 'delete', object_id: 'abc', owner_id: '123' })
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
@@ -89,10 +89,30 @@ describe('Webhook Endpoints', () => {
 
             const event = {
                 routeKey: 'POST /webhook',
-                body: JSON.stringify({ aspect_type: 'create', object_id: 'abc', owner_id: 'unknown' })
+                body: JSON.stringify({ object_type: 'activity', aspect_type: 'create', object_id: 'abc', owner_id: 'unknown' })
             };
             const response = await app.handler(event);
             expect(response.statusCode).toBe(200);
+            expect(queueService.enqueueActivitySync).not.toHaveBeenCalled();
+        });
+
+        it('should process athlete deauthorization and clear strava data', async () => {
+            const user = { googleUserId: 'test-user', stravaAthleteId: '123', stravaAccessToken: 'token' };
+            userRepository.getUserByStravaAthleteId.mockResolvedValue(user);
+
+            const event = {
+                routeKey: 'POST /webhook',
+                body: JSON.stringify({ object_type: 'athlete', aspect_type: 'update', object_id: '123', owner_id: '123', updates: { authorized: 'false' } })
+            };
+            const response = await app.handler(event);
+
+            expect(response.statusCode).toBe(200);
+            expect(userRepository.saveUser).toHaveBeenCalledWith({
+                googleUserId: 'test-user',
+                stravaAthleteId: null,
+                stravaAccessToken: null,
+                stravaRefreshToken: null
+            });
             expect(queueService.enqueueActivitySync).not.toHaveBeenCalled();
         });
     });
