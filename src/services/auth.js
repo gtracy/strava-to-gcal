@@ -11,6 +11,9 @@ class AuthService {
     async _getGoogleClient() {
         if (this.googleClient) return this.googleClient;
         const googleConfig = await config.getGoogle();
+        if (!googleConfig.clientId || !googleConfig.clientSecret) {
+            throw new Error('Google OAuth credentials are missing. Ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are set.');
+        }
         this.googleClient = new OAuth2Client(
             googleConfig.clientId,
             googleConfig.clientSecret

@@ -7,7 +7,7 @@ const keyId = process.env.KMS_KEY_ID;
 async function encrypt(text) {
     if (!text) return null;
     if (!keyId) {
-        logger.warn('KMS_KEY_ID not set, skipping encryption');
+        logger.debug('KMS_KEY_ID not set, skipping encryption');
         return text;
     }
 
@@ -27,7 +27,7 @@ async function encrypt(text) {
 async function decrypt(ciphertextBase64) {
     if (!ciphertextBase64) return null;
     if (!keyId) {
-        logger.warn('KMS_KEY_ID not set, skipping decryption');
+        logger.debug('KMS_KEY_ID not set, skipping decryption');
         return ciphertextBase64;
     }
 
