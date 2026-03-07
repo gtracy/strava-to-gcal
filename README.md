@@ -22,43 +22,62 @@ The frontend (Vite + React) uses a layered testing approach:
 ## Local Development
 
 ### Prerequisites
-- [Docker](https://www.docker.com/) (required for SAM local)
-- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 - [Node.js](https://nodejs.org/) (v22+)
+- [AWS CLI](https://aws.amazon.com/cli/) configured with credentials that have access to the deployed stack
 
 ### Backend Setup
 
-1.  **Configure Environment Variables**:
-    Create a `env.json` file in the root directory based on the example:
-    ```bash
-    cp env.json.example env.json
-    ```
-    Populate it with your Google and Strava credentials. This file is gitignored.
+1. **Configure Environment Variables**:
+   Create an `env.json` file in the root directory:
+   ```bash
+   cp env.json.example env.json
+   ```
 
-2.  **Start the Backend**:
-    Run the following command to start the Lambda functions locally:
-    ```bash
-    sam local start-api -n env.json
-    ```
-    ```
-    The API will be available at `http://127.0.0.1:3000`.
+   Populate it with your credentials. This file is gitignored.
 
-    **Alternative (Faster/No Docker):**
-    You can run the backend natively using a simple Node.js wrapper:
-    ```bash
-    npm run local
-    ```
-    This reads from `env.json` and runs `src/app.js` directly. Use this for rapid iteration.
+   | Variable | Description | How to get it |
+   |---|---|---|
+   | `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID | [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials) |
+   | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret | Same as above |
+   | `STRAVA_CLIENT_ID` | Strava API Application ID | [Strava API Settings](https://www.strava.com/settings/api) |
+   | `STRAVA_CLIENT_SECRET` | Strava API Client Secret | Same as above |
+   | `STRAVA_VERIFY_TOKEN` | Token for Strava webhook verification | Any string you choose (must match what's configured in Strava) |
+   | `JWT_SECRET` | Secret for signing JWT session tokens | Any strong random string |
+   | `USERS_TABLE_NAME` | DynamoDB table name | From CDK output or AWS Console |
+   | `KMS_KEY_ID` | AWS KMS key ID for encrypting user tokens | See below |
+   | `LOG_LEVEL` | Logging verbosity (`debug`, `info`, `warn`) | Optional, defaults to `info` |
+
+2. **Fetch the KMS Key ID**:
+   The KMS key encrypts user OAuth tokens in DynamoDB. Using the same key locally ensures you can sign in with the same Google account across local dev and AWS:
+   ```bash
+   aws kms list-aliases \
+     --query "Aliases[?AliasName=='alias/StravaToGcalTokens'].TargetKeyId|[0]" \
+     --output text
+   ```
+   Add the output as `KMS_KEY_ID` in your `env.json`.
+
+3. **Start the Backend**:
+
+   **Against real AWS DynamoDB** (uses your `env.json` credentials and KMS key):
+   ```bash
+   npm run local
+   ```
+
+   **With mock in-memory database** (no AWS access needed, good for UI development):
+   ```bash
+   npm run local:mock
+   ```
+
+   The API will be available at `http://localhost:3000`.
 
 ### Webhooks Dev Script
 
 An interactive CLI script is provided to manage your Strava webhooks locally (list, create, delete, and test with mock data).
 Ensure your `env.json` is configured with your Strava credentials and `STRAVA_VERIFY_TOKEN`.
-Run the script using:
 ```bash
 npm run webhook-setup
 ```
-If you are creating a new webhook destination locally, you will need a publicly accessible URL, which you can easily set up using [ngrok](https://ngrok.com/): `ngrok http 3000`.
+If creating a new webhook destination locally, you will need a publicly accessible URL via [ngrok](https://ngrok.com/): `ngrok http 3000`.
 
 ### Frontend Setup
 

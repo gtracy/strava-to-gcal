@@ -8,8 +8,9 @@ import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as kms from 'aws-cdk-lib/aws-kms';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
@@ -48,16 +49,10 @@ export class InfrastructureStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // 1.5 Security: KMS and Secrets Manager
+    // 1.5 Security: KMS for encrypting user tokens in DynamoDB
     const kmsKey = new kms.Key(this, 'TokenKey', {
       alias: 'alias/StravaToGcalTokens',
       description: 'Key for encrypting user tokens in DynamoDB',
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev
-    });
-
-    const appSecrets = new secretsmanager.Secret(this, 'AppSecrets', {
-      secretName: 'StravaToGcalAppSecrets',
-      description: 'Application secrets for Strava to Google Calendar sync',
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev
     });
 
@@ -68,20 +63,22 @@ export class InfrastructureStack extends cdk.Stack {
       handler: 'handler',
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
+      logRetention: logs.RetentionDays.THREE_MONTHS,
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
         KMS_KEY_ID: kmsKey.keyId,
-        SECRETS_NAME: appSecrets.secretName,
-        // Fallbacks for local environment compatibility if needed
-        STRAVA_VERIFY_TOKEN: process.env.STRAVA_VERIFY_TOKEN || 'strava-verify-token-fallback',
-        JWT_SECRET: process.env.JWT_SECRET || 'fallback-secret-for-cdk-synth'
+        STRAVA_VERIFY_TOKEN: process.env.STRAVA_VERIFY_TOKEN || '',
+        JWT_SECRET: process.env.JWT_SECRET || '',
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
+        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
       },
     });
 
     // Permissions
     kmsKey.grantEncryptDecrypt(stravaSyncLambda);
-    appSecrets.grantRead(stravaSyncLambda);
 
     // Grant Lambda permissions to DynamoDB Table
     usersTable.grantReadWriteData(stravaSyncLambda);
@@ -150,16 +147,19 @@ export class InfrastructureStack extends cdk.Stack {
       handler: 'handler',
       timeout: cdk.Duration.seconds(300),
       memorySize: 512,
+      logRetention: logs.RetentionDays.THREE_MONTHS,
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
         KMS_KEY_ID: kmsKey.keyId,
-        SECRETS_NAME: appSecrets.secretName
+        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
+        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
       }
     });
 
     kmsKey.grantEncryptDecrypt(activityFetchWorker);
-    appSecrets.grantRead(activityFetchWorker);
 
     activityFetchWorker.addEventSource(new SqsEventSource(activityFetchQueue));
 
@@ -174,16 +174,19 @@ export class InfrastructureStack extends cdk.Stack {
       handler: 'handler',
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      logRetention: logs.RetentionDays.THREE_MONTHS,
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
         KMS_KEY_ID: kmsKey.keyId,
-        SECRETS_NAME: appSecrets.secretName
+        STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
+        STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
       }
     });
 
     kmsKey.grantEncryptDecrypt(activitySyncWorker);
-    appSecrets.grantRead(activitySyncWorker);
 
     activitySyncWorker.addEventSource(new SqsEventSource(activitySyncQueue));
 

@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { mockClient } = require('aws-sdk-client-mock');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
-const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 const { KMSClient, EncryptCommand, DecryptCommand } = require('@aws-sdk/client-kms');
 
 // 1. Load Environment Variables
@@ -40,7 +39,6 @@ const localMemDb = new Map();
 if (useMockDb) {
     // Set mock markers only when mocking is enabled
     process.env.KMS_KEY_ID = 'mock-key-id';
-    process.env.SECRETS_NAME = 'mock-secrets';
 
     const ddbMock = mockClient(DynamoDBDocumentClient);
 
@@ -66,20 +64,7 @@ if (useMockDb) {
         return {};
     });
 
-    // 2.5 Mock Secrets Manager and KMS
-    const smMock = mockClient(SecretsManagerClient);
-    smMock.on(GetSecretValueCommand).callsFake(() => {
-        return {
-            SecretString: JSON.stringify({
-                STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID,
-                STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET,
-                GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-                GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-                JWT_SECRET: process.env.JWT_SECRET || 'local-dev-secret'
-            })
-        };
-    });
-
+    // 2.5 Mock KMS
     const kmsMock = mockClient(KMSClient);
     kmsMock.on(EncryptCommand).callsFake((input) => {
         return { CiphertextBlob: Buffer.from(`encrypted-${input.Plaintext.toString()}`) };
@@ -90,7 +75,7 @@ if (useMockDb) {
         return { Plaintext: Buffer.from(decryptedText) };
     });
 
-    console.log("🧪 Using Mock DynamoDB, Secrets Manager, and KMS (Local Memory)");
+    console.log("🧪 Using Mock DynamoDB and KMS (Local Memory)");
 } else {
     console.log("☁️  Using Remote AWS DynamoDB Table");
 }
