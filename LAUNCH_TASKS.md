@@ -9,7 +9,7 @@ This document outlines the required activities to transition the current persona
 
 ## 2. Infrastructure & Networking
 - [x] **Resource Naming:** Cleanup the naming conventions for resources so they are more identifiable and self-describe their purpose.
-- [ ] **Dead Letter Queues (DLQ):** Add DLQs to the `ActivitySyncQueue` and `ActivityFetchQueue` in the CDK stack to catch failed syncing jobs without losing data.
+- [x] **Dead Letter Queues (DLQ):** Add DLQs to the `ActivitySyncQueue` and `ActivityFetchQueue` in the CDK stack to catch failed syncing jobs without losing data.
 - [ ] **CI/CD:** Set up a GitHub Action for auto-deployments.
 - [ ] **Architecture Diagram:** Build an architecture diagram and add it to the README.
 - [ ] **Custom Domains & SSL:** 

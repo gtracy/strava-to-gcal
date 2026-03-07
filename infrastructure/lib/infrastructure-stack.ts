@@ -11,6 +11,10 @@ import * as kms from 'aws-cdk-lib/aws-kms';
 
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cw_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
@@ -143,10 +147,51 @@ export class InfrastructureStack extends cdk.Stack {
       integration: lambdaIntegration,
     });
 
+    // 3.5 Monitoring & Dead Letter Queues
+    const alertsTopic = new sns.Topic(this, 'AlertsTopic', {
+      topicName: 'StravaGcal-AlertsTopic',
+    });
+
+    if (process.env.ALERT_EMAIL) {
+      alertsTopic.addSubscription(new subscriptions.EmailSubscription(process.env.ALERT_EMAIL));
+    }
+
+    const activityFetchDLQ = new sqs.Queue(this, 'ActivityFetchDLQ', {
+      queueName: 'StravaGcal-ActivityFetchDLQ',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const fetchAlarm = new cloudwatch.Alarm(this, 'ActivityFetchDLQAlarm', {
+      alarmName: 'StravaGcal-ActivityFetch-DLQ-Alarm',
+      metric: activityFetchDLQ.metricApproximateNumberOfMessagesVisible(),
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    });
+    fetchAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
+
+    const activitySyncDLQ = new sqs.Queue(this, 'ActivitySyncDLQ', {
+      queueName: 'StravaGcal-ActivitySyncDLQ',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const syncAlarm = new cloudwatch.Alarm(this, 'ActivitySyncDLQAlarm', {
+      alarmName: 'StravaGcal-ActivitySync-DLQ-Alarm',
+      metric: activitySyncDLQ.metricApproximateNumberOfMessagesVisible(),
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    });
+    syncAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
+
     // 4. Activity Fetch Queue and Worker
     const activityFetchQueue = new sqs.Queue(this, 'ActivityFetchQueue', {
       queueName: 'StravaGcal-ActivityFetchQueue',
-      visibilityTimeout: cdk.Duration.seconds(300) // 5 minutes, give it time to fetch all pages
+      visibilityTimeout: cdk.Duration.seconds(300), // 5 minutes, give it time to fetch all pages
+      deadLetterQueue: {
+        maxReceiveCount: 3,
+        queue: activityFetchDLQ
+      }
     });
 
     const activityFetchWorker = new NodejsFunction(this, 'ActivityFetchWorker', {
@@ -177,7 +222,11 @@ export class InfrastructureStack extends cdk.Stack {
     // 5. Activity Sync Queue and Worker
     const activitySyncQueue = new sqs.Queue(this, 'ActivitySyncQueue', {
       queueName: 'StravaGcal-ActivitySyncQueue',
-      visibilityTimeout: cdk.Duration.seconds(60)
+      visibilityTimeout: cdk.Duration.seconds(60),
+      deadLetterQueue: {
+        maxReceiveCount: 3,
+        queue: activitySyncDLQ
+      }
     });
 
     const activitySyncWorker = new NodejsFunction(this, 'ActivitySyncWorker', {
