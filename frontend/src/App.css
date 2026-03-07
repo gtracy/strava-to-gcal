@@ -418,6 +418,32 @@ button:active {
   animation: fadeIn 0.5s ease-out both;
 }
 
+@keyframes fadeOutShrink {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    margin-bottom: 1.5rem;
+  }
+  60% {
+    opacity: 0;
+    transform: scale(0.95);
+    margin-bottom: 1.5rem;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+    margin-bottom: -50px;
+    padding-top: 0;
+    padding-bottom: 0;
+    height: 0;
+    border: 0;
+  }
+}
+
+.fade-out-shrink {
+  animation: fadeOutShrink 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
 @media (max-width: 600px) {
   h1.title {
     font-size: 2.5rem;

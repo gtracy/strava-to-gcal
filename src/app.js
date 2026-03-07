@@ -59,7 +59,7 @@ exports.handler = async (event) => {
                 statusCode: 200,
                 headers: {
                     "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, GET, PATCH, OPTIONS",
+                    "Access-Control-Allow-Methods": "POST, GET, PATCH, DELETE, OPTIONS",
                     "Access-Control-Allow-Headers": "Content-Type, Authorization"
                 },
                 body: ''
@@ -173,6 +173,12 @@ exports.handler = async (event) => {
             }
 
             const user = await userRepository.getUserByGoogleId(googleUserId);
+            if (!user) {
+                const err = new Error('User not found');
+                err.statusCode = 404;
+                throw err;
+            }
+
             return {
                 statusCode: 200,
                 headers: { "Access-Control-Allow-Origin": "*" },
@@ -322,9 +328,12 @@ exports.handler = async (event) => {
 
             const user = await userRepository.getUserByGoogleId(googleUserId);
             if (!user) {
-                const err = new Error('User not found');
-                err.statusCode = 404;
-                throw err;
+                logger.info({ googleUserId }, 'User already deleted, returning success for graceful disconnect');
+                return {
+                    statusCode: 200,
+                    headers: { "Access-Control-Allow-Origin": "*" },
+                    body: JSON.stringify({ success: true, message: 'Account already deleted' })
+                };
             }
 
             // Concurrently revoke tokens
@@ -380,11 +389,16 @@ exports.handler = async (event) => {
 
         // GET /webhook - Verification
         if (routeKey === 'GET /webhook') {
-            logger.info('Webhook verification endpoint reached v1.1 - deploy fix');
-            const params = new URLSearchParams(rawQueryString);
-            const challenge = params.get('hub.challenge');
-            const verifyToken = params.get('hub.verify_token');
-            const mode = params.get('hub.mode');
+            logger.info({
+                raw: event.rawQueryString,
+                parsed: event.queryStringParameters
+            }, 'Webhook verification endpoint reached v1.2');
+
+            // API Gateway V2 typically provides parsed query strings in event.queryStringParameters
+            const params = new URLSearchParams(event.rawQueryString || '');
+            const challenge = event.queryStringParameters?.['hub.challenge'] || params.get('hub.challenge');
+            const verifyToken = event.queryStringParameters?.['hub.verify_token'] || params.get('hub.verify_token');
+            const mode = event.queryStringParameters?.['hub.mode'] || params.get('hub.mode');
 
             if (mode && verifyToken) {
                 if (mode === 'subscribe' && verifyToken === process.env.STRAVA_VERIFY_TOKEN) {
@@ -394,11 +408,14 @@ exports.handler = async (event) => {
                         body: JSON.stringify({ "hub.challenge": challenge })
                     };
                 } else {
-                    logger.error({ mode, verifyToken }, 'Webhook verification failed: token or mode mismatch');
+                    logger.error({ mode, verifyToken, expectedTokenHasValue: !!process.env.STRAVA_VERIFY_TOKEN }, 'Webhook verification failed: token or mode mismatch');
                     return { statusCode: 403, body: 'Forbidden' };
                 }
             } else {
-                logger.error({ params: rawQueryString }, 'Webhook Verification failed: missing mode or verify_token');
+                logger.error({
+                    rawQueryString: event.rawQueryString,
+                    queryStringParameters: event.queryStringParameters
+                }, 'Webhook Verification failed: missing mode or verify_token');
                 return { statusCode: 403, body: 'Forbidden' };
             }
         }
@@ -408,7 +425,7 @@ exports.handler = async (event) => {
             const payload = JSON.parse(body);
             logger.info({ payload }, 'Received webhook payload');
 
-            const { aspect_type, object_id, owner_id, updates } = payload;
+            const { object_type, aspect_type, object_id, owner_id, updates } = payload;
 
             // 1. Find User
             const user = await userRepository.getUserByStravaAthleteId(owner_id);
@@ -417,7 +434,25 @@ exports.handler = async (event) => {
                 return { statusCode: 200, body: 'Ignored: User not found' };
             }
 
-            // Enqueue the message to ActivitySyncQueue instead of processing it synchronously
+            // 2. Handle Athlete Deauthorization or other athlete events
+            if (object_type === 'athlete') {
+                if (updates?.authorized === 'false') {
+                    logger.info({ owner_id }, 'Athlete deauthorized app. Disconnecting Strava...');
+                    user.stravaAccessToken = null;
+                    user.stravaRefreshToken = null;
+                    user.stravaAthleteId = null;
+                    await userRepository.saveUser(user);
+                }
+                return { statusCode: 200, body: 'OK' };
+            }
+
+            // 3. Ignore other non-activity events
+            if (object_type !== 'activity') {
+                logger.debug({ object_type }, 'Ignoring non-activity webhook');
+                return { statusCode: 200, body: 'OK' };
+            }
+
+            // 4. Enqueue the activity message to ActivitySyncQueue
             await queueService.enqueueActivitySync(owner_id, object_id, aspect_type, updates);
 
             return { statusCode: 200, body: 'OK' };

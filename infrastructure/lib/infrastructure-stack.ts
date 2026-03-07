@@ -96,6 +96,7 @@ export class InfrastructureStack extends cdk.Stack {
           apigwv2.CorsHttpMethod.GET,
           apigwv2.CorsHttpMethod.POST,
           'PATCH' as apigwv2.CorsHttpMethod,
+          'DELETE' as apigwv2.CorsHttpMethod,
           apigwv2.CorsHttpMethod.OPTIONS,
         ],
         allowOrigins: ['*'],
