@@ -22,7 +22,7 @@ This document outlines the required activities to transition the current persona
 - [ ] **Idempotent Webhooks:** Ensure webhook events don't duplicate calendar events if processed multiple times (useful if a queue message is retried).
 
 ## 4. Frontend Polish & User Experience
-- [ ] **Landing Page:** Create a marketing landing page explaining the value proposition to new, unauthenticated users.
+- [ ] **Landing Page Content:** Create content on the current landing page that shows off examples of the service to new, unauthenticated users.
 - [ ] **Support/FAQ:** Add a page or section to help users troubleshoot issues (e.g., "Why didn't my activity sync?").
 - [ ] **User Controls:** Expose a "Pause Syncing" feature in the frontend (and backend `PATCH /user`) so users can temporarily stop the integration without fully deleting their account.
 
