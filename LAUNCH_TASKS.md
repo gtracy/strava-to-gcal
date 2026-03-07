@@ -9,6 +9,7 @@ This document outlines the required activities to transition the current persona
 
 ## 2. Infrastructure & Networking
 - [x] **Resource Naming:** Cleanup the naming conventions for resources so they are more identifiable and self-describe their purpose.
+- [ ] **CI/CD:** Set up a GitHub Action for auto-deployments.
 - [ ] **Custom Domains & SSL:** 
   - Set up a custom domain.
   - Set up CloudFront with OAC (Origin Access Control) for the frontend S3 bucket instead of public S3 access (better security).
@@ -16,7 +17,6 @@ This document outlines the required activities to transition the current persona
 - [ ] **API Rate Limiting:** Configure API Gateway Usage Plans or standard rate limiting to prevent abuse on authentication and webhook endpoints.
 - [ ] **Dead Letter Queues (DLQ):** Add DLQs to the `ActivitySyncQueue` and `ActivityFetchQueue` in the CDK stack to catch failed syncing jobs without losing data.
 - [ ] **CloudWatch Monitoring & Alarms:** Set up basic alarms for Lambda error rates and DLQ message counts, connected to an SNS topic that emails the administrator.
-- [ ] **CI/CD:** Set up a GitHub Action for auto-deployments.
 
 ## 3. Application Resiliency & Error Handling
 - [ ] **Token Revocation Handling:** Ensure the application gracefully handles user token revocation (e.g., if a user revokes access via Google or Strava, mark the user state as "disconnected" instead of continually failing background jobs).
