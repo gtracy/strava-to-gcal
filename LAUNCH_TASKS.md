@@ -15,6 +15,7 @@ This document outlines the required activities to transition the current persona
 - [ ] **API Rate Limiting:** Configure API Gateway Usage Plans or standard rate limiting to prevent abuse on authentication and webhook endpoints.
 - [ ] **Dead Letter Queues (DLQ):** Add DLQs to the `ActivitySyncQueue` and `ActivityFetchQueue` in the CDK stack to catch failed syncing jobs without losing data.
 - [ ] **CloudWatch Monitoring & Alarms:** Set up basic alarms for Lambda error rates and DLQ message counts, connected to an SNS topic that emails the administrator.
+- [ ] **CI/CD:** Set up a GitHub Action for auto-deployments.
 
 ## 3. Application Resiliency & Error Handling
 - [ ] **Token Revocation Handling:** Ensure the application gracefully handles user token revocation (e.g., if a user revokes access via Google or Strava, mark the user state as "disconnected" instead of continually failing background jobs).
@@ -24,9 +25,9 @@ This document outlines the required activities to transition the current persona
 ## 4. Frontend Polish & User Experience
 - [ ] **Landing Page Content:** Create content on the current landing page that shows off examples of the service to new, unauthenticated users.
 - [ ] **Support/FAQ:** Add a page or section to help users troubleshoot issues (e.g., "Why didn't my activity sync?").
-- [ ] **User Controls:** Expose a "Pause Syncing" feature in the frontend (and backend `PATCH /user`) so users can temporarily stop the integration without fully deleting their account.
+- [ ] **Donations:** Integrate donation options for users.
+- [ ] **Footer:** Create a footer that includes references to the creator, the GitHub repo, and the creator's Threads account.
 
 ## 5. Security Posture
 - [ ] **Frontend Security:** Implement proper Content Security Policy (CSP) headers.
-- [ ] **WAF (Optional):** Deploy AWS WAF on the API Gateway / CloudFront to block known bad actors.
 - [ ] **Dependency Scanning:** Integrate Dependabot or similar automated vulnerability scanning in GitHub Actions.
