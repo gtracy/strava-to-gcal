@@ -68,6 +68,7 @@ export class InfrastructureStack extends cdk.Stack {
       memorySize: 512,
       logRetention: logs.RetentionDays.THREE_MONTHS,
       environment: {
+        NODE_OPTIONS: '--no-deprecation',
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
         KMS_KEY_ID: kmsKey.keyId,
@@ -158,6 +159,7 @@ export class InfrastructureStack extends cdk.Stack {
       memorySize: 512,
       logRetention: logs.RetentionDays.THREE_MONTHS,
       environment: {
+        NODE_OPTIONS: '--no-deprecation',
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
         KMS_KEY_ID: kmsKey.keyId,
@@ -188,6 +190,7 @@ export class InfrastructureStack extends cdk.Stack {
       memorySize: 512,
       logRetention: logs.RetentionDays.THREE_MONTHS,
       environment: {
+        NODE_OPTIONS: '--no-deprecation',
         USERS_TABLE_NAME: usersTable.tableName,
         LOG_LEVEL: 'info',
         KMS_KEY_ID: kmsKey.keyId,

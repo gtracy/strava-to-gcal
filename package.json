@@ -4,12 +4,12 @@
   "description": "Serverless service to sync Strava activities to Google Calendar",
   "main": "src/app.js",
   "scripts": {
-    "test": "jest",
+    "test": "NODE_OPTIONS='--no-deprecation' jest",
     "deploy": "npm run build:frontend && cd infrastructure && npx cdk deploy",
     "build:frontend": "cd frontend && npm run build",
-    "local": "node scripts/local-server.js",
-    "local:mock": "node scripts/local-server.js --mock-db",
-    "webhook-setup": "node scripts/strava-webhooks.js",
+    "local": "NODE_OPTIONS='--no-deprecation' node scripts/local-server.js",
+    "local:mock": "NODE_OPTIONS='--no-deprecation' node scripts/local-server.js --mock-db",
+    "webhook-setup": "NODE_OPTIONS='--no-deprecation' node scripts/strava-webhooks.js",
     "secrets:push": "echo 'Secrets Manager removed. Set secrets as Lambda env vars in env.json and redeploy.'"
   },
   "dependencies": {
