@@ -8,6 +8,7 @@ This document outlines the required activities to transition the current persona
 - [ ] **Strava API Review:** Submit the app for Strava review to increase rate limits (default is limited to 100 requests/15 min, 1,000/day).
 
 ## 2. Infrastructure & Networking
+- [ ] **Resource Naming:** Cleanup the naming conventions for resources so they are more identifiable and self-describe their purpose.
 - [ ] **Custom Domains & SSL:** 
   - Set up a custom domain.
   - Set up CloudFront with OAC (Origin Access Control) for the frontend S3 bucket instead of public S3 access (better security).
