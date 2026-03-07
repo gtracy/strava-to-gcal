@@ -177,10 +177,6 @@ export class InfrastructureStack extends cdk.Stack {
       topicName: 'StravaGcal-AlertsTopic',
     });
 
-    if (process.env.ALERT_EMAIL) {
-      alertsTopic.addSubscription(new subscriptions.EmailSubscription(process.env.ALERT_EMAIL));
-    }
-
     const activityFetchDLQ = new sqs.Queue(this, 'ActivityFetchDLQ', {
       queueName: 'StravaGcal-ActivityFetchDLQ',
       retentionPeriod: cdk.Duration.days(14),
