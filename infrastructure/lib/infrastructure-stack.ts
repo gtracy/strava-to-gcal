@@ -38,6 +38,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 1. DynamoDB Table
     const usersTable = new dynamodb.Table(this, 'UsersTable', {
+      tableName: 'StravaGcal-Users',
       partitionKey: { name: 'googleUserId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev/test. Change to RETAIN for prod.
@@ -58,6 +59,8 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 2. Lambda Function
     const stravaSyncLambda = new NodejsFunction(this, 'StravaSyncFunction', {
+      functionName: 'StravaGcal-ApiHandler',
+      description: 'API Gateway handler for authentication, user management, and Strava webhooks',
       runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../../src/app.js'),
       handler: 'handler',
@@ -85,6 +88,8 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 3. HTTP API (API Gateway V2)
     const httpApi = new apigwv2.HttpApi(this, 'StravaSyncApi', {
+      apiName: 'StravaGcal-Api',
+      description: 'API Gateway for the Strava-to-GCal service',
       corsPreflight: {
         allowHeaders: ['Content-Type', 'Authorization'],
         allowMethods: [
@@ -138,10 +143,13 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 4. Activity Fetch Queue and Worker
     const activityFetchQueue = new sqs.Queue(this, 'ActivityFetchQueue', {
+      queueName: 'StravaGcal-ActivityFetchQueue',
       visibilityTimeout: cdk.Duration.seconds(300) // 5 minutes, give it time to fetch all pages
     });
 
     const activityFetchWorker = new NodejsFunction(this, 'ActivityFetchWorker', {
+      functionName: 'StravaGcal-ActivityFetchWorker',
+      description: 'Worker process that fetches historical and recent activities from Strava',
       runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../../src/workers/fetch-worker.js'),
       handler: 'handler',
@@ -165,10 +173,13 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 5. Activity Sync Queue and Worker
     const activitySyncQueue = new sqs.Queue(this, 'ActivitySyncQueue', {
+      queueName: 'StravaGcal-ActivitySyncQueue',
       visibilityTimeout: cdk.Duration.seconds(60)
     });
 
     const activitySyncWorker = new NodejsFunction(this, 'ActivitySyncWorker', {
+      functionName: 'StravaGcal-ActivitySyncWorker',
+      description: 'Worker process that synchronizes fetched Strava activities to Google Calendar',
       runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../../src/workers/sync-worker.js'),
       handler: 'handler',
