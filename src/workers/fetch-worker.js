@@ -4,7 +4,7 @@ const userRepository = require('../repositories/user-repository');
 const authService = require('../services/auth');
 const stravaService = require('../services/strava');
 const queueService = require('../services/queue');
-const { TokenRevokedError } = require('../utils/token-errors');
+const { TokenRevokedError, RateLimitError } = require('../utils/api-errors');
 
 exports.handler = async (event) => {
     logger.info({ event }, 'ActivityFetchWorker received event');
@@ -57,6 +57,11 @@ exports.handler = async (event) => {
             }
 
         } catch (error) {
+            if (error instanceof RateLimitError) {
+                logger.warn({ userId, provider: error.provider }, 'Rate limit hit. Re-throwing to trigger SQS retry with visibility timeout backoff.');
+                throw error; // Let SQS retry
+            }
+
             logger.error({ errMessage: error.message, stack: error.stack }, 'Error processing fetch record');
             // Re-throw so SQS can retry or send to DLQ
             throw error;

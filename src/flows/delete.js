@@ -3,7 +3,7 @@ const authService = require('../services/auth');
 const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
-const { TokenRevokedError } = require('../utils/token-errors');
+const { TokenRevokedError } = require('../utils/api-errors');
 
 async function handleDelete(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling delete flow');

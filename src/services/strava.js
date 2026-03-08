@@ -1,6 +1,7 @@
 const axios = require('axios');
 const config = require('../config');
 const logger = require('../logger');
+const { RateLimitError, isRateLimitError } = require('../utils/api-errors');
 
 
 
@@ -15,6 +16,13 @@ async function getActivity(accessToken, id) {
         logger.debug({ stravaId: id, status: response.status }, 'Fetched Strava activity');
         return response.data;
     } catch (error) {
+        if (isRateLimitError(error)) {
+            const usage = error.response?.headers?.['x-ratelimit-usage'] || 'unknown';
+            const limit = error.response?.headers?.['x-ratelimit-limit'] || 'unknown';
+            logger.warn({ stravaId: id, usage, limit }, 'Strava rate limit exceeded');
+            throw new RateLimitError('strava', 900, error); // 900s = 15 minutes
+        }
+
         const errorDetails = error.response?.data ? {
             status: error.response.status,
             stravaMessage: error.response.data.message,
@@ -60,6 +68,13 @@ async function listActivities(accessToken, afterEpoch, beforeEpoch) {
         logger.debug({ count: allActivities.length }, 'Fetched all Strava activities');
         return allActivities;
     } catch (error) {
+        if (isRateLimitError(error)) {
+            const usage = error.response?.headers?.['x-ratelimit-usage'] || 'unknown';
+            const limit = error.response?.headers?.['x-ratelimit-limit'] || 'unknown';
+            logger.warn({ page, usage, limit }, 'Strava rate limit exceeded during activity list');
+            throw new RateLimitError('strava', 900, error);
+        }
+
         const errorDetails = error.response?.data ? {
             status: error.response.status,
             stravaMessage: error.response.data.message,
@@ -75,3 +90,4 @@ module.exports = {
     getActivity,
     listActivities
 };
+

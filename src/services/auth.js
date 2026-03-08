@@ -2,7 +2,7 @@ const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
 const logger = require('../logger');
 const config = require('../config');
-const { TokenRevokedError, isTokenRevocationError } = require('../utils/token-errors');
+const { TokenRevokedError, isTokenRevocationError, RateLimitError, isRateLimitError } = require('../utils/api-errors');
 
 class AuthService {
     constructor() {
@@ -108,6 +108,13 @@ class AuthService {
             });
             return response.data;
         } catch (error) {
+            if (isRateLimitError(error)) {
+                const usage = error.response?.headers?.['x-ratelimit-usage'] || 'unknown';
+                const limit = error.response?.headers?.['x-ratelimit-limit'] || 'unknown';
+                logger.warn({ usage, limit }, 'Strava rate limit exceeded during token refresh');
+                throw new RateLimitError('strava', 900, error);
+            }
+
             if (isTokenRevocationError(error)) {
                 logger.warn({
                     status: error.response?.status,

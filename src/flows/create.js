@@ -5,7 +5,7 @@ const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
 const { buildEventDescription, buildEventLocation } = require('../utils/strava-formatter');
-const { TokenRevokedError } = require('../utils/token-errors');
+const { TokenRevokedError } = require('../utils/api-errors');
 
 async function handleCreate(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling create flow');

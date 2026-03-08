@@ -9,6 +9,16 @@ class TokenRevokedError extends Error {
     }
 }
 
+class RateLimitError extends Error {
+    constructor(provider, retryAfterSeconds, originalError) {
+        super(`Rate limit exceeded for ${provider}`);
+        this.name = 'RateLimitError';
+        this.provider = provider;
+        this.retryAfterSeconds = retryAfterSeconds;
+        this.originalError = originalError;
+    }
+}
+
 /**
  * Checks if an error indicates a permanently revoked token.
  * - Strava: 401 from /oauth/token
@@ -29,4 +39,12 @@ function isTokenRevocationError(error) {
     return false;
 }
 
-module.exports = { TokenRevokedError, isTokenRevocationError };
+/**
+ * Checks if an error is a 429 rate limit response.
+ */
+function isRateLimitError(error) {
+    const status = error.response?.status || error.status;
+    return status === 429;
+}
+
+module.exports = { TokenRevokedError, isTokenRevocationError, RateLimitError, isRateLimitError };

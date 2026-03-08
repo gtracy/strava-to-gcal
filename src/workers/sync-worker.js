@@ -31,6 +31,11 @@ exports.handler = async (event) => {
             }
 
         } catch (error) {
+            if (error.name === 'RateLimitError') {
+                logger.warn({ userId, activityId, provider: error.provider }, 'Rate limit hit. Re-throwing to trigger SQS retry with visibility timeout backoff.');
+                throw error; // Let SQS retry
+            }
+
             logger.error({ errMessage: error.message, stack: error.stack }, 'Error processing sync record');
             // Re-throw to trigger SQS retry or send to DLQ
             throw error;
