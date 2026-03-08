@@ -158,20 +158,20 @@ export class InfrastructureStack extends cdk.Stack {
       };
       defaultStage.routeSettings = {
         'POST /auth/google': {
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
+          ThrottlingBurstLimit: 10,
+          ThrottlingRateLimit: 5,
         },
         'POST /auth/strava': {
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
+          ThrottlingBurstLimit: 10,
+          ThrottlingRateLimit: 5,
         },
         'POST /webhook': {
-          throttlingBurstLimit: 100,
-          throttlingRateLimit: 50,
+          ThrottlingBurstLimit: 100,
+          ThrottlingRateLimit: 50,
         },
         'GET /webhook': {
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
+          ThrottlingBurstLimit: 10,
+          ThrottlingRateLimit: 5,
         },
       };
     }
@@ -452,7 +452,7 @@ export class InfrastructureStack extends cdk.Stack {
       comment: 'Security headers policy including strict CSP',
       securityHeadersBehavior: {
         contentSecurityPolicy: {
-          contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.amazonaws.com; img-src 'self' data: https://*;",
+          contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://*.amazonaws.com; frame-src 'self' https://accounts.google.com/gsi/; img-src 'self' data: https://*;",
           override: true,
         },
         contentTypeOptions: { override: true },
