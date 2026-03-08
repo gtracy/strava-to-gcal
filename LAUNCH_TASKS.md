@@ -36,5 +36,5 @@ This document outlines the required activities to transition the current persona
 - [ ] **Favicon:** Add a custom favicon for the site.
 
 ## 5. Security Posture
-- [ ] **Frontend Security:** Implement proper Content Security Policy (CSP) headers.
-- [ ] **Dependency Scanning:** Integrate Dependabot or similar automated vulnerability scanning in GitHub Actions.
+- [x] **Frontend Security:** Implement proper Content Security Policy (CSP) headers.
+- [x] **Dependency Scanning:** Integrate Dependabot or similar automated vulnerability scanning in GitHub Actions.
