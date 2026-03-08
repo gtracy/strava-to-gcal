@@ -10,8 +10,7 @@
     "local": "NODE_OPTIONS='--no-deprecation' node scripts/local-server.js",
     "local:mock": "NODE_OPTIONS='--no-deprecation' node scripts/local-server.js --mock-db",
     "webhook-setup": "NODE_OPTIONS='--no-deprecation' node scripts/strava-webhooks.js",
-    "dlq:redrive": "NODE_OPTIONS='--no-deprecation' node scripts/redrive-dlq.js",
-    "secrets:push": "echo 'Secrets Manager removed. Set secrets as Lambda env vars in env.json and redeploy.'"
+    "dlq:redrive": "NODE_OPTIONS='--no-deprecation' node scripts/redrive-dlq.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.980.0",
