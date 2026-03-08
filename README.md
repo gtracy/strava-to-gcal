@@ -130,3 +130,6 @@ Add these in your repo's **Settings → Secrets and variables → Actions**:
 | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 client secret |
 | `KMS_KEY_ID` | AWS KMS key ID for token encryption |
 | `ALERT_EMAIL` | Email for CloudWatch alarm notifications |
+
+## System Architecture
+![Architecture Diagram](./docs/architecture.png)
