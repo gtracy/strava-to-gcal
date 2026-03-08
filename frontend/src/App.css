@@ -164,45 +164,6 @@ button:active {
   transform: scale(0.97);
 }
 
-/* Google Button */
-.btn-google {
-  background-color: #ffffff;
-  color: #1f1f1f;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 4px 20px 4px 4px;
-  border-radius: 100px;
-  height: 48px;
-  font-size: 15px;
-  font-weight: 500;
-  box-sizing: border-box;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  margin-top: 1rem;
-}
-
-.btn-google__icon {
-  width: 40px;
-  height: 40px;
-  background: #fff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-google svg {
-  width: 20px;
-  height: 20px;
-}
-
-.btn-google:hover {
-  background-color: #f8f9fa;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-  transform: translateY(-1px);
-}
-
 /* Strava Button */
 .btn-strava {
   background-color: var(--strava-orange);

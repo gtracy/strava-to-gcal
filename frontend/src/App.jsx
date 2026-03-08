@@ -1,6 +1,5 @@
-import { GoogleLogo } from './GoogleLogo';
 import { useState, useEffect } from 'react'
-import { useGoogleLogin } from '@react-oauth/google'
+import { GoogleLogin } from '@react-oauth/google'
 import axios from 'axios'
 import stravaConnectBtn from './assets/btn_strava_connectwith_orange.svg';
 import stravaPoweredBy from './assets/api_logo_pwrdBy_strava_horiz_white.svg';
@@ -60,34 +59,33 @@ function App({ dynamicConfig }) {
     }
   }, []);
 
-  const login = useGoogleLogin({
-    onSuccess: async (codeResponse) => {
-      setLoading(true);
-      try {
-        const res = await axios.post(`${API_URL}/auth/google`, {
-          code: codeResponse.code,
-          redirectUri: window.location.origin
-        });
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/auth/google/credential`, {
+        credential: credentialResponse.credential,
+      });
 
-        setUser(res.data.user);
-        localStorage.setItem('strava_gcal_user', JSON.stringify(res.data.user));
-        if (res.data.token) {
-          localStorage.setItem('strava_gcal_token', res.data.token);
-        }
-        if (res.data.user.googleUserId) {
-          fetchCalendars(res.data.token);
-        }
-      } catch (err) {
-        console.error(err);
-        const errorMsg = err.response?.data?.error || 'Login Failed';
-        showMessage(errorMsg);
-      } finally {
-        setLoading(false);
+      setUser(res.data.user);
+      localStorage.setItem('strava_gcal_user', JSON.stringify(res.data.user));
+      if (res.data.token) {
+        localStorage.setItem('strava_gcal_token', res.data.token);
       }
-    },
-    flow: 'auth-code',
-    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events openid email profile'
-  });
+      if (res.data.user.googleUserId) {
+        fetchCalendars(res.data.token);
+      }
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.error || 'Login Failed';
+      showMessage(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    showMessage('Google Login Failed');
+  };
 
   const fetchCalendars = async (tokenOverride) => {
     try {
@@ -291,13 +289,19 @@ function App({ dynamicConfig }) {
             </div>
 
             <div className="login-card glass-panel" style={{ marginTop: '0' }}>
-              <p className="subtitle" style={{ marginBottom: '1.5rem' }}>Ready to get started?</p>
-              <button className="btn-google" style={{ marginTop: '0' }} onClick={() => login()}>
-                <div className="btn-google__icon">
-                  <GoogleLogo />
-                </div>
-                <span className="btn-google__text">Continue with Google</span>
-              </button>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Sign in with Google to get started</p>
+              <div style={{ marginTop: '1rem' }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleLoginSuccess}
+                  onError={handleGoogleLoginError}
+                  useOneTap
+                  theme="filled_black"
+                  shape="pill"
+                  size="large"
+                  text="continue_with"
+                  width="280"
+                />
+              </div>
             </div>
 
           </div>

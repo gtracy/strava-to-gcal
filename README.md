@@ -96,3 +96,37 @@ If creating a new webhook destination locally, you will need a publicly accessib
     npm run dev
     ```
     The app will run at `http://localhost:5173`.
+
+## Deployment
+
+### CI/CD Pipeline
+Deployments are automated via **GitHub Actions** and triggered when a release tag is pushed.
+
+**To deploy:**
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The pipeline will:
+1. Run the test suite
+2. Build the frontend
+3. Generate `env.json` from GitHub Secrets
+4. Deploy infrastructure and application via CDK
+
+### Required GitHub Secrets
+Add these in your repo's **Settings → Secrets and variables → Actions**:
+
+| Secret | Description |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | IAM access key with CDK deploy permissions |
+| `AWS_SECRET_ACCESS_KEY` | Corresponding IAM secret key |
+| `AWS_REGION` | AWS region (e.g., `us-east-2`) |
+| `STRAVA_CLIENT_ID` | Strava API application ID |
+| `STRAVA_CLIENT_SECRET` | Strava API client secret |
+| `STRAVA_REFRESH_TOKEN` | Strava refresh token |
+| `STRAVA_VERIFY_TOKEN` | Strava webhook verification token |
+| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 client secret |
+| `KMS_KEY_ID` | AWS KMS key ID for token encryption |
+| `ALERT_EMAIL` | Email for CloudWatch alarm notifications |

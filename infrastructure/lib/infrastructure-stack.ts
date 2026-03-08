@@ -147,6 +147,34 @@ export class InfrastructureStack extends cdk.Stack {
       integration: lambdaIntegration,
     });
 
+    // 3.1 API Rate Limiting
+    // Configure throttling on the auto-created $default stage
+    const defaultStage = httpApi.defaultStage?.node.defaultChild as apigwv2.CfnStage;
+    if (defaultStage) {
+      defaultStage.defaultRouteSettings = {
+        throttlingBurstLimit: 20,
+        throttlingRateLimit: 10,
+      };
+      defaultStage.routeSettings = {
+        'POST /auth/google': {
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+        'POST /auth/strava': {
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+        'POST /webhook': {
+          throttlingBurstLimit: 100,
+          throttlingRateLimit: 50,
+        },
+        'GET /webhook': {
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+      };
+    }
+
     // --- APIGW METRICS ---
     const apigwMetrics = {
       count: new cloudwatch.Metric({
@@ -391,6 +419,23 @@ export class InfrastructureStack extends cdk.Stack {
           activitySyncWorker.metricErrors({ label: 'Sync Worker' })
         ],
         width: 12
+      })
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'API Throttled Requests (429s)',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/ApiGateway',
+            metricName: '4XXError',
+            dimensionsMap: { ApiId: httpApi.apiId },
+            statistic: cloudwatch.Stats.SUM,
+            period: cdk.Duration.minutes(1),
+            label: '4XX Errors (includes 429s)',
+          }),
+        ],
+        width: 24
       })
     );
 
