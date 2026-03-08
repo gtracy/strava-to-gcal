@@ -18,7 +18,8 @@ import * as cw_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 // Attempt to load env.json securely at synth time
 const envPath = path.join(__dirname, '../../env.json');
 if (fs.existsSync(envPath)) {
@@ -439,21 +440,59 @@ export class InfrastructureStack extends cdk.Stack {
       })
     );
 
-    // 7. Frontend S3 Bucket
+    // 7. Frontend S3 Bucket (Private, accessed only via CloudFront)
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
-      websiteIndexDocument: 'index.html',
-      publicReadAccess: true,
-      blockPublicAccess: new s3.BlockPublicAccess({
-        blockPublicAcls: true,
-        blockPublicPolicy: false,
-        ignorePublicAcls: true,
-        restrictPublicBuckets: false
-      }),
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true, // For dev convenience
     });
 
-    // 8. Deploy Frontend Assets and Dynamic Config
+    // 8. CloudFront & CSP Security Headers
+    const cspHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeadersPolicy', {
+      comment: 'Security headers policy including strict CSP',
+      securityHeadersBehavior: {
+        contentSecurityPolicy: {
+          contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.amazonaws.com; img-src 'self' data: https://*;",
+          override: true,
+        },
+        contentTypeOptions: { override: true },
+        frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
+        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
+        strictTransportSecurity: {
+          accessControlMaxAge: cdk.Duration.days(365),
+          includeSubdomains: true,
+          override: true,
+          preload: true,
+        },
+        xssProtection: { protection: true, modeBlock: true, override: true },
+      },
+    });
+
+    const frontendDistribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
+      defaultBehavior: {
+        origin: new origins.S3Origin(frontendBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        responseHeadersPolicy: cspHeadersPolicy,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.seconds(0),
+        },
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.seconds(0),
+        }
+      ],
+    });
+
+    // 9. Deploy Frontend Assets and Dynamic Config
     const deployment = new s3deploy.BucketDeployment(this, 'DeployFrontendWithConfig', {
       sources: [
         s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist')),
@@ -464,7 +503,9 @@ export class InfrastructureStack extends cdk.Stack {
         })
       ],
       destinationBucket: frontendBucket,
-      prune: false,
+      distribution: frontendDistribution,
+      distributionPaths: ['/*'],
+      prune: false, // Prevents deleting files that shouldn't be deleted, consider making true later
     });
 
     // Ensure the API exists before we try to extract its endpoint
@@ -477,8 +518,8 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'FrontendUrl', {
-      value: frontendBucket.bucketWebsiteUrl,
-      description: 'URL for the frontend SPA',
+      value: `https://${frontendDistribution.distributionDomainName}`,
+      description: 'CloudFront URL for the frontend SPA',
     });
   }
 }
