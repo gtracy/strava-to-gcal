@@ -4,6 +4,7 @@ const userRepository = require('../repositories/user-repository');
 const authService = require('../services/auth');
 const stravaService = require('../services/strava');
 const queueService = require('../services/queue');
+const { TokenRevokedError } = require('../utils/token-errors');
 
 exports.handler = async (event) => {
     logger.info({ event }, 'ActivityFetchWorker received event');
@@ -29,6 +30,11 @@ exports.handler = async (event) => {
                 user.stravaRefreshToken = stravaData.refresh_token;
                 await userRepository.saveUser(user);
             } catch (err) {
+                if (err instanceof TokenRevokedError) {
+                    logger.warn({ userId, provider: err.provider }, 'Token revoked, marking user as disconnected');
+                    await userRepository.markDisconnected(user.googleUserId, err.provider);
+                    continue; // Skip this record — do not retry
+                }
                 logger.error({ errMessage: err.message, userId }, 'Failed to refresh Strava token');
                 throw err;
             }

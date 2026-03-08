@@ -2,6 +2,7 @@ const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
 const logger = require('../logger');
 const config = require('../config');
+const { TokenRevokedError, isTokenRevocationError } = require('../utils/token-errors');
 
 class AuthService {
     constructor() {
@@ -80,12 +81,20 @@ class AuthService {
 
     // Refresh Google Token if needed
     async refreshGoogleToken(refreshToken) {
-        const client = await this._getGoogleClient();
-        client.setCredentials({
-            refresh_token: refreshToken
-        });
-        const { credentials } = await client.refreshAccessToken();
-        return credentials;
+        try {
+            const client = await this._getGoogleClient();
+            client.setCredentials({
+                refresh_token: refreshToken
+            });
+            const { credentials } = await client.refreshAccessToken();
+            return credentials;
+        } catch (error) {
+            if (isTokenRevocationError(error)) {
+                logger.warn({ errMessage: error.message }, 'Google token has been revoked');
+                throw new TokenRevokedError('google', error);
+            }
+            throw error;
+        }
     }
 
     async refreshStravaToken(refreshToken) {
@@ -99,6 +108,14 @@ class AuthService {
             });
             return response.data;
         } catch (error) {
+            if (isTokenRevocationError(error)) {
+                logger.warn({
+                    status: error.response?.status,
+                    stravaMessage: error.response?.data?.message
+                }, 'Strava token has been revoked');
+                throw new TokenRevokedError('strava', error);
+            }
+
             const errorDetails = error.response?.data ? {
                 status: error.response.status,
                 stravaMessage: error.response.data.message,

@@ -5,6 +5,7 @@ const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
 const { buildEventDescription, buildEventLocation } = require('../utils/strava-formatter');
+const { TokenRevokedError } = require('../utils/token-errors');
 
 async function handleCreate(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling create flow');
@@ -22,6 +23,11 @@ async function handleCreate(user, stravaActivityId) {
             tokensUpdated = true;
         }
     } catch (e) {
+        if (e instanceof TokenRevokedError) {
+            logger.warn({ googleUserId: user.googleUserId, provider: e.provider }, 'Token revoked during create flow, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, e.provider);
+            return; // Stop processing — do not retry
+        }
         logger.error({ errMessage: e.message, status: e.status || e.response?.status }, 'Failed to refresh Strava token');
         throw e;
     }
@@ -43,6 +49,11 @@ async function handleCreate(user, stravaActivityId) {
             tokensUpdated = true;
         }
     } catch (e) {
+        if (e instanceof TokenRevokedError) {
+            logger.warn({ googleUserId: user.googleUserId, provider: e.provider }, 'Token revoked during create flow, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, e.provider);
+            return; // Stop processing — do not retry
+        }
         logger.error({ errMessage: e.message, status: e.status || e.response?.status }, 'Failed to refresh Google token');
         throw e;
     }

@@ -105,6 +105,42 @@ class UserRepository {
             throw error;
         }
     }
+
+    /**
+     * Mark a user as disconnected for a specific provider.
+     * Clears the revoked tokens so workers stop retrying.
+     */
+    async markDisconnected(googleUserId, provider) {
+        const updateExprParts = ['#status = :disconnected'];
+        const exprAttrNames = { '#status': 'status' };
+        const exprAttrValues = { ':disconnected': 'disconnected' };
+
+        if (provider === 'strava') {
+            updateExprParts.push('stravaAccessToken = :empty', 'stravaRefreshToken = :empty', 'hasStrava = :false');
+            exprAttrValues[':empty'] = null;
+            exprAttrValues[':false'] = false;
+        } else if (provider === 'google') {
+            updateExprParts.push('googleAccessToken = :empty', 'googleRefreshToken = :empty');
+            exprAttrValues[':empty'] = null;
+        }
+
+        const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
+        const params = {
+            TableName: this.tableName,
+            Key: { googleUserId },
+            UpdateExpression: `SET ${updateExprParts.join(', ')}`,
+            ExpressionAttributeNames: exprAttrNames,
+            ExpressionAttributeValues: exprAttrValues,
+        };
+
+        try {
+            await this.docClient.send(new UpdateCommand(params));
+            logger.info({ googleUserId, provider }, 'User marked as disconnected');
+        } catch (error) {
+            logger.error({ errMessage: error.message, googleUserId, provider }, 'Failed to mark user as disconnected');
+            throw error;
+        }
+    }
 }
 
 module.exports = new UserRepository();

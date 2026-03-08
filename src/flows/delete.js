@@ -3,6 +3,7 @@ const authService = require('../services/auth');
 const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
+const { TokenRevokedError } = require('../utils/token-errors');
 
 async function handleDelete(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling delete flow');
@@ -27,6 +28,11 @@ async function handleDelete(user, stravaActivityId) {
             tokensUpdated = true;
         }
     } catch (e) {
+        if (e instanceof TokenRevokedError) {
+            logger.warn({ googleUserId: user.googleUserId, provider: e.provider }, 'Token revoked during delete flow, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, e.provider);
+            return;
+        }
         logger.error({ errMessage: e.message, status: e.status || e.response?.status }, 'Failed to refresh Google token');
         throw e;
     }
