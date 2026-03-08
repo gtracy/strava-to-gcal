@@ -25,7 +25,7 @@ This document outlines the required activities to transition the current persona
 ## 3. Application Resiliency & Error Handling
 - [x] **Token Revocation Handling:** Ensure the application gracefully handles user token revocation (e.g., if a user revokes access via Google or Strava, mark the user state as "disconnected" instead of continually failing background jobs).
 - [x] **Strava Rate Limit Backoff:** Implement aware rate-limiting or backoff in the workers (`ActivityFetchWorker` and `ActivitySyncWorker`) in case Strava's limits are breached during high load.
-- [ ] **Idempotent Webhooks:** Ensure webhook events don't duplicate calendar events if processed multiple times (useful if a queue message is retried).
+- [x] **Idempotent Webhooks:** Ensure webhook events don't duplicate calendar events if processed multiple times (useful if a queue message is retried).
 
 ## 4. Frontend Polish & User Experience
 - [ ] **Landing Page Content:** Create content on the current landing page that shows off examples of the service to new, unauthenticated users.

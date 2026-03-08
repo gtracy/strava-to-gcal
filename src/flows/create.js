@@ -92,6 +92,7 @@ async function handleCreate(user, stravaActivityId) {
     const eventLocation = await buildEventLocation(activity);
 
     const eventData = {
+        id: `strava${stravaActivityId}`,
         summary: activity.name,
         location: eventLocation,
         start: { dateTime: startDate.toISOString() },
@@ -105,8 +106,18 @@ async function handleCreate(user, stravaActivityId) {
         },
     };
 
-    await googleCalendarService.createEvent(googleAuthClient, eventData, calendarId);
-    logger.info({ stravaActivityId }, 'Successfully created Google Calendar event');
+    try {
+        await googleCalendarService.createEvent(googleAuthClient, eventData, calendarId);
+        logger.info({ stravaActivityId }, 'Successfully created Google Calendar event');
+    } catch (error) {
+        if (error.status === 409 || error.code === 409) {
+            logger.info({ stravaActivityId }, 'Event creation conflicted (409), another worker already created it. Falling back to update flow.');
+            const updateFlow = require('./update');
+            await updateFlow.handleUpdate(user, stravaActivityId, { force: true });
+            return;
+        }
+        throw error;
+    }
 }
 
 module.exports = { handleCreate };

@@ -54,12 +54,48 @@ describe('Flows', () => {
             );
         });
 
-        it('should skip creation if event exists', async () => {
+        it('should skip creation if event exists internally (check idempotency phase)', async () => {
             googleCalendarService.findEventByStravaId.mockResolvedValue({ id: 'evt1' });
+
+            // We need to mock handleUpdate to avoid calling the real one
+            const updateFlow = require('../src/flows/update');
+            jest.spyOn(updateFlow, 'handleUpdate').mockResolvedValue();
 
             await createFlow.handleCreate(mockUser, 123);
 
             expect(googleCalendarService.createEvent).not.toHaveBeenCalled();
+            expect(updateFlow.handleUpdate).toHaveBeenCalledWith(mockUser, 123, { force: true });
+            updateFlow.handleUpdate.mockRestore();
+        });
+
+        it('should fallback to update flow if Google Calendar returns 409 Conflict', async () => {
+            googleCalendarService.findEventByStravaId.mockResolvedValue(null);
+            stravaService.getActivity.mockResolvedValue({
+                id: 123,
+                name: 'Test Run',
+                type: 'Run',
+                start_date: '2023-01-01T10:00:00Z',
+                elapsed_time: 3600,
+                distance: 10000
+            });
+
+            const conflictError = new Error('Conflict');
+            conflictError.status = 409;
+            googleCalendarService.createEvent.mockRejectedValueOnce(conflictError);
+
+            const updateFlow = require('../src/flows/update');
+            jest.spyOn(updateFlow, 'handleUpdate').mockResolvedValue();
+
+            await createFlow.handleCreate(mockUser, 123);
+
+            expect(googleCalendarService.createEvent).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ id: 'strava123' }),
+                'primary'
+            );
+            expect(updateFlow.handleUpdate).toHaveBeenCalledWith(mockUser, 123, { force: true });
+
+            updateFlow.handleUpdate.mockRestore();
         });
     });
 
