@@ -249,7 +249,9 @@ function App({ dynamicConfig }) {
   return (
     <div className="app-wrapper">
       <div className="container fade-in-up">
-        <h1 className="title">Sync Strava to Google Calendar</h1>
+        <h1 className="title" style={{ lineHeight: '1.1', marginBottom: '0.5rem' }}>
+          Sync your Strava activities<br />to Google Calendar
+        </h1>
         {msg.text && (
           <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`}>
             {msg.text}
@@ -460,6 +462,20 @@ function App({ dynamicConfig }) {
               )}
             </div>
 
+            {user.hasStrava && (
+              <div className="fade-in-up" style={{ animationDelay: '0.45s', textAlign: 'center', width: '100%' }}>
+                <a
+                  href="https://buymeacoffee.com/gregtracy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bmc-btn"
+                >
+                  <span className="bmc-emoji" role="img" aria-label="coffee">🧡</span>
+                  Free, but buy me some Skratch? 🙏
+                </a>
+              </div>
+            )}
+
             <div className="card-item fade-in-up" style={{ animationDelay: '0.5s', marginTop: '2rem', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.03)' }}>
               {!showDeleteModal ? (
                 <>
@@ -560,6 +576,9 @@ function App({ dynamicConfig }) {
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
                   <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"></path>
                 </svg>
+              </a>
+              <a href="https://buymeacoffee.com/gregtracy" target="_blank" rel="noopener noreferrer" className="bmc-footer-icon" title="Buy me some Skratch" aria-label="Buy me some Skratch">
+                🧡
               </a>
             </div>
 
