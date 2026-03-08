@@ -31,7 +31,7 @@ if (fs.existsSync(envPath)) {
         account: account || process.env.CDK_DEFAULT_ACCOUNT,
         region: region || process.env.CDK_DEFAULT_REGION
       };
-      console.log(`Using environment from env.json: ${manualEnv.account}/${manualEnv.region}`);
+      console.log(`Using environment from env.json: [REDACTED_ACCOUNT]/${manualEnv.region}`);
     }
   }
 }

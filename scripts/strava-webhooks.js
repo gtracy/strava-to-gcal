@@ -95,7 +95,7 @@ async function deleteSubscription() {
             client_secret: STRAVA_CLIENT_SECRET
         };
         console.log(`URL: ${url}`);
-        console.log(`Params: ${JSON.stringify(params)}`);
+        console.log(`Params: { client_id: ${params.client_id}, client_secret: [REDACTED] }`);
 
         await axios.delete(url, { params });
         console.log("\nSubscription deleted successfully.");
