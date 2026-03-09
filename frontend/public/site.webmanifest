@@ -1,6 +1,6 @@
 {
-    "name": "Strava to Google Calendar",
-    "short_name": "Activity Sync",
+    "name": "ClockingSweat",
+    "short_name": "ClockingSweat",
     "icons": [
         {
             "src": "/icon-192x192.png",
