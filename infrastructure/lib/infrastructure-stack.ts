@@ -181,7 +181,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     httpApi.addRoutes({
       path: '/user',
-      methods: ['PATCH' as apigwv2.HttpMethod],
+      methods: ['PATCH' as apigwv2.HttpMethod, 'DELETE' as apigwv2.HttpMethod],
       integration: lambdaIntegration,
     });
 
@@ -487,9 +487,14 @@ export class InfrastructureStack extends cdk.Stack {
     // 8. CloudFront & CSP Security Headers
     const cspHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeadersPolicy', {
       comment: 'Security headers policy including strict CSP',
+      customHeadersBehavior: {
+        customHeaders: [
+          { header: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups', override: true }
+        ]
+      },
       securityHeadersBehavior: {
         contentSecurityPolicy: {
-          contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://*.amazonaws.com; frame-src 'self' https://accounts.google.com/gsi/; img-src 'self' data: https://*;",
+          contentSecurityPolicy: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://*.amazonaws.com https://${apiDomainName} https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-src 'self' https://accounts.google.com/gsi/; img-src 'self' data: https://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com;`,
           override: true,
         },
         contentTypeOptions: { override: true },
