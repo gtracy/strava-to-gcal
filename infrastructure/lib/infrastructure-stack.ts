@@ -19,6 +19,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
+import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 // Attempt to load env.json securely at synth time
 const envPath = path.join(__dirname, '../../env.json');
@@ -62,6 +65,13 @@ export class InfrastructureStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev
     });
 
+    // 1.8 Custom Domain: Route 53 DNS (Phase 1)
+    const domainName = 'clockingsweat.com';
+    const hostedZone = new route53.PublicHostedZone(this, 'HostedZone', {
+      zoneName: domainName,
+      comment: 'Hosted zone for Strava to GCal Sync App',
+    });
+
     // 2. Lambda Function
     const stravaSyncLambda = new NodejsFunction(this, 'StravaSyncFunction', {
       functionName: 'StravaGcal-ApiHandler',
@@ -93,9 +103,24 @@ export class InfrastructureStack extends cdk.Stack {
     usersTable.grantReadWriteData(stravaSyncLambda);
 
     // 3. HTTP API (API Gateway V2)
+    // 3.1 Backend ACM Certificate & Custom Domain
+    const apiDomainName = `api.${domainName}`;
+    const apiCert = new certificatemanager.Certificate(this, 'ApiCertificate', {
+      domainName: apiDomainName,
+      validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
+    });
+
+    const apiCustomDomain = new apigwv2.DomainName(this, 'ApiCustomDomain', {
+      domainName: apiDomainName,
+      certificate: apiCert,
+    });
+
     const httpApi = new apigwv2.HttpApi(this, 'StravaSyncApi', {
       apiName: 'StravaGcal-Api',
       description: 'API Gateway for the Strava-to-GCal service',
+      defaultDomainMapping: {
+        domainName: apiCustomDomain,
+      },
       corsPreflight: {
         allowHeaders: ['Content-Type', 'Authorization'],
         allowMethods: [
@@ -107,6 +132,18 @@ export class InfrastructureStack extends cdk.Stack {
         ],
         allowOrigins: ['*'],
       },
+    });
+
+    // 3.2 DNS Record for API Gateway
+    new route53.ARecord(this, 'ApiAliasRecord', {
+      zone: hostedZone,
+      recordName: 'api',
+      target: route53.RecordTarget.fromAlias(
+        new route53Targets.ApiGatewayv2DomainProperties(
+          apiCustomDomain.regionalDomainName,
+          apiCustomDomain.regionalHostedZoneId
+        )
+      ),
     });
 
     const lambdaIntegration = new HttpLambdaIntegration('LambdaIntegration', stravaSyncLambda);
@@ -468,6 +505,15 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
+    // 8.1 Frontend ACM Certificate (Must be us-east-1 for CloudFront)
+    const frontendCert = new certificatemanager.DnsValidatedCertificate(this, 'FrontendCertificate', {
+      domainName: domainName,
+      subjectAlternativeNames: [`www.${domainName}`],
+      hostedZone,
+      region: 'us-east-1', // CloudFront certificates MUST be provisioned in us-east-1
+      cleanupRoute53Records: true, // cleans up validation records
+    });
+
     const frontendDistribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
       defaultBehavior: {
         origin: new origins.S3Origin(frontendBucket),
@@ -475,6 +521,8 @@ export class InfrastructureStack extends cdk.Stack {
         responseHeadersPolicy: cspHeadersPolicy,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
+      certificate: frontendCert,
+      domainNames: [domainName, `www.${domainName}`],
       defaultRootObject: 'index.html',
       errorResponses: [
         {
@@ -492,12 +540,25 @@ export class InfrastructureStack extends cdk.Stack {
       ],
     });
 
+    // 8.2 DNS Records for Frontend (Root and www)
+    new route53.ARecord(this, 'FrontendAliasRecord', {
+      zone: hostedZone,
+      recordName: domainName,
+      target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(frontendDistribution)),
+    });
+
+    new route53.ARecord(this, 'FrontendWwwAliasRecord', {
+      zone: hostedZone,
+      recordName: 'www',
+      target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(frontendDistribution)),
+    });
+
     // 9. Deploy Frontend Assets and Dynamic Config
     const deployment = new s3deploy.BucketDeployment(this, 'DeployFrontendWithConfig', {
       sources: [
         s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist')),
         s3deploy.Source.jsonData('config.json', {
-          VITE_API_URL: httpApi.apiEndpoint,
+          VITE_API_URL: `https://${apiDomainName}`,
           VITE_GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
           VITE_STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || ''
         })
@@ -520,6 +581,11 @@ export class InfrastructureStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'FrontendUrl', {
       value: `https://${frontendDistribution.distributionDomainName}`,
       description: 'CloudFront URL for the frontend SPA',
+    });
+
+    new cdk.CfnOutput(this, 'DomainNameServers', {
+      value: cdk.Fn.join(', ', hostedZone.hostedZoneNameServers as string[]),
+      description: 'Name servers for the Route 53 Hosted Zone (Copy these to Namecheap Custom DNS)',
     });
   }
 }
