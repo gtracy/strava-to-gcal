@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import App from './App.jsx'
 import './index.css'
+import ReactGA from 'react-ga4';
 
 const defaultGoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -32,6 +33,9 @@ async function init() {
     googleId: config.VITE_GOOGLE_CLIENT_ID ? 'set' : 'missing',
     stravaId: config.VITE_STRAVA_CLIENT_ID ? 'set' : 'missing'
   });
+
+  // Initialize GA4
+  ReactGA.initialize('G-9V6LR6MVNN');
 
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>

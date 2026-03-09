@@ -4,6 +4,7 @@ import axios from 'axios'
 import stravaConnectBtn from './assets/btn_strava_connectwith_orange.svg';
 import stravaPoweredBy from './assets/api_logo_pwrdBy_strava_horiz_white.svg';
 import './App.css'
+import ReactGA from 'react-ga4';
 
 function App({ dynamicConfig }) {
   const API_URL = dynamicConfig?.VITE_API_URL || import.meta.env.VITE_API_URL;
@@ -57,6 +58,9 @@ function App({ dynamicConfig }) {
       setUser(JSON.parse(storedUser));
       fetchCalendars(token);
     }
+
+    // Track initial page view
+    ReactGA.send({ hitType: 'pageview', page: window.location.pathname });
   }, []);
 
   const login = useGoogleLogin({
@@ -76,6 +80,12 @@ function App({ dynamicConfig }) {
         if (res.data.user.googleUserId) {
           fetchCalendars(res.data.token);
         }
+
+        ReactGA.event({
+          category: 'Engagement',
+          action: 'Google Login',
+          label: 'Success'
+        });
       } catch (err) {
         console.error(err);
         const errorMsg = err.response?.data?.error || 'Login Failed';
@@ -86,7 +96,7 @@ function App({ dynamicConfig }) {
     },
     onError: () => showMessage('Google Login Failed'),
     flow: 'auth-code',
-    scope: 'https://www.googleapis.com/auth/calendar.events',
+    scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',
   });
 
   const fetchCalendars = async (tokenOverride) => {
@@ -139,6 +149,12 @@ function App({ dynamicConfig }) {
 
       await fetchCalendars(token);
       showMessage('Calendar created successfully!', 'success');
+
+      ReactGA.event({
+        category: 'Engagement',
+        action: 'Create Calendar',
+        label: 'Success'
+      });
     } catch (err) {
       console.error("Failed to create calendar", err);
       if (err.response?.status === 401 || err.response?.status === 404) {
@@ -171,6 +187,12 @@ function App({ dynamicConfig }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       handleLogout('Account deleted successfully. All data has been removed!', 'success');
+
+      ReactGA.event({
+        category: 'Engagement',
+        action: 'Account Disconnect',
+        label: 'Success'
+      });
     } catch (err) {
       console.error("Failed to delete account", err);
       // Gracefully handle 404: if the user is already deleted, just log them out and reset UI
@@ -228,6 +250,12 @@ function App({ dynamicConfig }) {
       });
       setUser(prev => ({ ...prev, hasStrava: true }));
       showMessage('Strava Connected Successfully!', 'success');
+
+      ReactGA.event({
+        category: 'Engagement',
+        action: 'Strava Connect',
+        label: 'Success'
+      });
     } catch (err) {
       console.error("Strava Connection Error", err);
       if (err.response?.status === 401) {
