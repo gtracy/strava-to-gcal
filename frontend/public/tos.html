@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - Clocking Sweat</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #fc4c02;
+            /* Strava Orange */
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: var(--text-color);
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--accent-color);
+        }
+
+        p,
+        ul,
+        li {
+            color: var(--text-muted);
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            font-style: italic;
+            margin-bottom: 2rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            padding: 8px 16px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            transition: all 0.2s ease;
+        }
+
+        .back-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to App</a>
+
+        <h1>Terms of Service</h1>
+        <p class="last-updated">Last Updated: March 8, 2026</p>
+
+        <p>Welcome to Clocking Sweat. By accessing or using our website located at clockingsweat.com (the "Service"),
+            you agree to be bound by these Terms of Service.</p>
+
+        <h2>1. Description of Service</h2>
+        <p>Clocking Sweat provides a self-service utility for synchronizing workout activity data from a user's
+            authenticated Strava account to a user's authenticated Google Calendar. This Service operates autonomously
+            in the background via webhooks once configured by the user.</p>
+
+        <h2>2. Third-Party Services and Trademarks</h2>
+        <p>Our Service interacts directly with the Google Calendar API and the Strava API. By using our Service, you
+            also agree to be bound by the Google Terms of Service and Strava Terms of Service.</p>
+        <p>Clocking Sweat is an independent application entirely separate from Strava, Inc. and Google LLC. The Strava
+            name, the Strava logo, the "Powered by Strava" mark, and Google Calendar are registered trademarks of their
+            respective owners. Their inclusion in this Service does not imply endorsement.</p>
+
+        <h2>3. Acceptable Use and Restrictions</h2>
+        <p>By using the Service, you agree that you will not:</p>
+        <ul>
+            <li>Use the Service for any unlawful purpose or in violation of any local, state, national, or international
+                law.</li>
+            <li>Attempt to interfere with or compromise the system integrity or security of the Service.</li>
+            <li>Use automated scripts, bots, or scrapers to access or interact with the Service's APIs.</li>
+            <li>Impel the Service to exceed the rate limits established by the Google Calendar and Strava APIs.</li>
+        </ul>
+        <p>We reserve the right to terminate or suspend your access to the Service immediately, without prior notice, if
+            you violate these Terms.</p>
+
+        <h2>4. Disclaimer of Warranties</h2>
+        <p>THE SERVICE IS PROVIDED ON AN "AS-IS" AND "AS-AVAILABLE" BASIS. TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE
+            DISCLAIM ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED. WE DO NOT WARRANT THAT THE SERVICE WILL BE
+            UNINTERRUPTED, SECURE, ACCURATE, OR ERROR-FREE.</p>
+        <p>We are entirely beholden to the uptime and availability of the Strava and Google Calendar APIs. If either of
+            those APIs experiences an outage, our Service will also be degraded.</p>
+
+        <h2>5. Limitation of Liability</h2>
+        <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL CLOCKING SWEAT OR ITS CREATORS BE LIABLE
+            FOR ANY INDIRECT, PUNITIVE, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR EXEMPLARY DAMAGES, INCLUDING WITHOUT
+            LIMITATION, DAMAGES FOR LOSS OF PROFITS, GOODWILL, USE, DATA OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR
+            RELATING TO THE USE OF, OR INABILITY TO USE, THIS SERVICE.</p>
+        <p>Because our Service has write-access to your Google Calendar, you explicitly agree that we are not liable for
+            any deletion, corruption, mis-formatting, or duplication of calendar events that may occur due to
+            synchronization bugs, API errors, or misuse of the Service.</p>
+
+        <h2>6. User Data Deletion</h2>
+        <p>You may terminate this agreement at any time by utilizing the "Disconnect all services" function within the
+            application dashboard. This action will permanently delete your authentication tokens and user profile from
+            our servers.</p>
+
+        <h2>7. Changes to Terms</h2>
+        <p>We reserve the right to modify or replace these Terms at any time at our sole discretion. We will indicate
+            the date of the last revision at the top of this page.</p>
+
+        <h2>8. Contact Us</h2>
+        <p>If you have any questions or concerns about these Terms, please contact us via the GitHub repository or the
+            social links provided in the application footer.</p>
+    </div>
+</body>
+
+</html>

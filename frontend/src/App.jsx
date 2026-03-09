@@ -611,9 +611,9 @@ function App({ dynamicConfig }) {
             </div>
 
             <div className="footer-center">
-              <a href="#" className="footer-link">privacy policy</a>
+              <a href="/privacy.html" className="footer-link">privacy policy</a>
               <span className="footer-separator">|</span>
-              <a href="#" className="footer-link">terms of service</a>
+              <a href="/tos.html" className="footer-link">terms of service</a>
             </div>
 
             <div className="footer-right">
