@@ -276,48 +276,51 @@ function App({ dynamicConfig }) {
 
   return (
     <div className="app-wrapper">
-      <div className="container fade-in-up">
+      <main className="container fade-in-up">
+        <p className="subtitle" style={{ marginTop: '0', fontSize: '1.2rem', color: 'var(--text-muted)', marginBottom: '1.5rem', fontWeight: '400' }}>
+          Clocking <span className="highlight-text">Sweat</span>
+        </p>
         <h1 className="title" style={{ lineHeight: '1.1', marginBottom: '0.5rem' }}>
-          Sync your Strava activities<br />to Google Calendar
+          Sync your Strava activities<br />to Google Calendar.
         </h1>
         {msg.text && (
-          <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`}>
+          <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`}>
             {msg.text}
           </div>
         )}
 
         {loading ? (
-          <div className="loading-spinner fade-in">Loading...</div>
+          <div className="loading-spinner fade-in" aria-live="polite">Loading...</div>
         ) : !user ? (
-          <div className="landing-container fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <section className="landing-container fade-in-up" style={{ animationDelay: '0.1s' }}>
 
             <div className="steps-card glass-panel">
               <h2 className="steps-title">How it works</h2>
-              <div className="steps-list">
-                <div className="step-item">
-                  <div className="step-number">1</div>
+              <ol className="steps-list" style={{ listStyle: 'none', padding: 0 }}>
+                <li className="step-item">
+                  <div className="step-number" aria-hidden="true">1</div>
                   <div className="step-content">
                     <h3>Connect Google</h3>
                     <p>Sign into your Google account and grant access to your calendar</p>
                   </div>
-                </div>
-                <div className="step-connector"></div>
-                <div className="step-item">
-                  <div className="step-number">2</div>
+                </li>
+                <div className="step-connector" aria-hidden="true"></div>
+                <li className="step-item">
+                  <div className="step-number" aria-hidden="true">2</div>
                   <div className="step-content">
                     <h3>Select Calendar</h3>
                     <p>Choose a calendar to sync with</p>
                   </div>
-                </div>
-                <div className="step-connector"></div>
-                <div className="step-item">
-                  <div className="step-number">3</div>
+                </li>
+                <div className="step-connector" aria-hidden="true"></div>
+                <li className="step-item">
+                  <div className="step-number" aria-hidden="true">3</div>
                   <div className="step-content">
                     <h3>Link Strava</h3>
                     <p>Sign into your Strava account to begin syncing</p>
                   </div>
-                </div>
-              </div>
+                </li>
+              </ol>
             </div>
 
             <div className="login-card glass-panel" style={{ marginTop: '0' }}>
@@ -326,6 +329,7 @@ function App({ dynamicConfig }) {
                 <button
                   onClick={() => login()}
                   className="btn btn-primary"
+                  aria-label="Continue with Google"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -344,21 +348,21 @@ function App({ dynamicConfig }) {
                     fontFamily: '"Roboto", "Google Sans", "Inter", sans-serif',
                     fontSize: '14px'
                   }}
-                  onMouseOver={(e) => Object.assign(e.target.style, { backgroundColor: '#f8f9fa' })}
-                  onMouseOut={(e) => Object.assign(e.target.style, { backgroundColor: 'white' })}
+                  onMouseOver={(e) => Object.assign(e.currentTarget.style, { backgroundColor: '#f8f9fa' })}
+                  onMouseOut={(e) => Object.assign(e.currentTarget.style, { backgroundColor: 'white' })}
                 >
-                  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="18px" height="18px" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.9c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="18px" height="18px" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.9c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
                   Continue with Google
                 </button>
               </div>
             </div>
 
-          </div>
+          </section>
         ) : (
-          <div className="dashboard glass-panel fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <section className="dashboard glass-panel fade-in-up" style={{ animationDelay: '0.1s' }}>
 
             <div className="card-item fade-in-up" style={{ animationDelay: '0.2s' }}>
-              <span className="icon success-icon">
+              <span className="icon success-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
               </span>
               <div className="status-text">
@@ -370,7 +374,7 @@ function App({ dynamicConfig }) {
             <div className="card-item fade-in-up" style={{ animationDelay: '0.3s' }}>
               {!isEditingCalendar ? (
                 <>
-                  <span className="icon success-icon">
+                  <span className="icon success-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </span>
                   <div className="connect-action">
@@ -389,7 +393,7 @@ function App({ dynamicConfig }) {
                 </>
               ) : (
                 <>
-                  <div className="icon">
+                  <div className="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                   </div>
                   <div className="status-text">
@@ -410,6 +414,7 @@ function App({ dynamicConfig }) {
                         value={user.selectedCalendarId || 'primary'}
                         onChange={handleCalendarChange}
                         disabled={calendars.length === 0}
+                        aria-label="Select destination calendar"
                         style={{ marginTop: '1rem' }}
                       >
                         {/* Put Strava first if it exists */}
@@ -445,6 +450,7 @@ function App({ dynamicConfig }) {
                           value={user.selectedCalendarId || 'primary'}
                           onChange={handleCalendarChange}
                           disabled={calendars.length === 0}
+                          aria-label="Select destination calendar"
                         >
                           <option value="primary">Primary Calendar</option>
                           {calendars.filter(c => !c.primary).map(c => (
@@ -469,7 +475,7 @@ function App({ dynamicConfig }) {
             <div className="card-item fade-in-up" style={{ animationDelay: '0.4s' }}>
               {user.hasStrava ? (
                 <>
-                  <span className="icon success-icon">
+                  <span className="icon success-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </span>
                   <div className="status-text">
@@ -507,7 +513,7 @@ function App({ dynamicConfig }) {
             <div className="card-item fade-in-up" style={{ animationDelay: '0.5s', marginTop: '2rem', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.03)' }}>
               {!showDeleteModal ? (
                 <>
-                  <div className="icon" style={{ color: 'var(--accent-color)' }}>
+                  <div className="icon" style={{ color: 'var(--accent-color)' }} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                   </div>
                   <div className="status-text">
@@ -524,7 +530,7 @@ function App({ dynamicConfig }) {
                         style={{ fontSize: '0.875rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: 0, backgroundColor: 'transparent', border: 'none' }}
                         onClick={() => setShowDeleteModal(true)}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c-.6 0-1.1.2-1.5.5L8.6 5.6C9.6 4.6 10.7 4.1 12 4c5.5 0 10 4.5 10 10 0 1.3-.3 2.5-1 3.5l-1.5-1.5c.3-.6.5-1.3.5-2 0-4.4-3.6-8-8-8zm4.4 12.3-1.4-1.4c-.9.7-1.9 1.1-3 1.1-4.4 0-8-3.6-8-8 0-1.1.4-2.1 1.1-3l-1.4-1.4C2.7 8.1 2 9.9 2 12c0 5.5 4.5 10 10 10 2.1 0 3.9-.7 5.4-1.7zM13 12.8V9c0-.6-.4-1-1-1s-1 .4-1 1v3.8l2 2zM3 2.3 1.7 3.6l19 19 1.3-1.3-19-19z" /></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7c-.6 0-1.1.2-1.5.5L8.6 5.6C9.6 4.6 10.7 4.1 12 4c5.5 0 10 4.5 10 10 0 1.3-.3 2.5-1 3.5l-1.5-1.5c.3-.6.5-1.3.5-2 0-4.4-3.6-8-8-8zm4.4 12.3-1.4-1.4c-.9.7-1.9 1.1-3 1.1-4.4 0-8-3.6-8-8 0-1.1.4-2.1 1.1-3l-1.4-1.4C2.7 8.1 2 9.9 2 12c0 5.5 4.5 10 10 10 2.1 0 3.9-.7 5.4-1.7zM13 12.8V9c0-.6-.4-1-1-1s-1 .4-1 1v3.8l2 2zM3 2.3 1.7 3.6l19 19 1.3-1.3-19-19z" /></svg>
                         Disconnect all services
                       </button>
                     </div>
@@ -582,9 +588,9 @@ function App({ dynamicConfig }) {
               )}
             </div>
 
-          </div>
+          </section>
         )}
-      </div>
+      </main>
 
       {!loading && (
         <footer className="global-footer fade-in" style={{ animationDelay: '0.6s' }}>

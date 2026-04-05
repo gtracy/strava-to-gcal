@@ -485,6 +485,29 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     // 8. CloudFront & CSP Security Headers
+    const redirectWwwFunction = new cloudfront.Function(this, 'RedirectWwwFunction', {
+      functionName: 'RedirectWwwToRoot',
+      code: cloudfront.FunctionCode.fromInline(`
+        function handler(event) {
+          var request = event.request;
+          var host = request.headers.host.value;
+
+          if (host === 'www.clockingsweat.com') {
+            var response = {
+              statusCode: 301,
+              statusDescription: 'Moved Permanently',
+              headers: {
+                "location": { "value": "https://clockingsweat.com" + request.uri }
+              }
+            };
+            return response;
+          }
+
+          return request;
+        }
+      `),
+    });
+
     const cspHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeadersPolicy', {
       comment: 'Security headers policy including strict CSP',
       customHeadersBehavior: {
@@ -525,6 +548,12 @@ export class InfrastructureStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         responseHeadersPolicy: cspHeadersPolicy,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: [
+          {
+            function: redirectWwwFunction,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
       certificate: frontendCert,
       domainNames: [domainName, `www.${domainName}`],
