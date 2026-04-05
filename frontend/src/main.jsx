@@ -1,6 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import { BrowserRouter } from 'react-router-dom'
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3'
 import App from './App.jsx'
 import './index.css'
 import ReactGA from 'react-ga4';
@@ -39,9 +41,13 @@ async function init() {
 
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
-      <GoogleOAuthProvider clientId={config.VITE_GOOGLE_CLIENT_ID}>
-        <App dynamicConfig={config} />
-      </GoogleOAuthProvider>
+      <BrowserRouter>
+        <GoogleReCaptchaProvider reCaptchaKey="6LcgYacsAAAAAC1-1ZFBZAhF-0hzFtuhdMSMN3Id">
+          <GoogleOAuthProvider clientId={config.VITE_GOOGLE_CLIENT_ID}>
+            <App dynamicConfig={config} />
+          </GoogleOAuthProvider>
+        </GoogleReCaptchaProvider>
+      </BrowserRouter>
     </React.StrictMode>,
   )
 }

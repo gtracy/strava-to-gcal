@@ -6,6 +6,8 @@ const queueService = require('./services/queue');
 const authService = require('./services/auth');
 const googleCalendarService = require('./services/googleCalendar');
 const userRepository = require('./repositories/user-repository');
+const emailService = require('./services/email');
+const axios = require('axios');
 
 const getJwtSecret = async () => {
     return await config.getJwtSecret() || process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
@@ -16,6 +18,21 @@ const verifySession = async (headers) => {
     const token = headers.authorization.split(' ')[1];
     const secret = await getJwtSecret();
     return jwt.verify(token, secret).googleUserId;
+};
+
+const verifyRecaptcha = async (token) => {
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+    if (!secretKey) {
+        logger.warn('RECAPTCHA_SECRET_KEY not set, skipping verification (Development mode)');
+        return true;
+    }
+    try {
+        const response = await axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${token}`);
+        return response.data.success;
+    } catch (err) {
+        logger.error({ err }, 'reCAPTCHA verification failed');
+        return false;
+    }
 };
 
 const handleError = (error, context = {}) => {
@@ -383,6 +400,39 @@ exports.handler = async (event) => {
             await queueService.enqueueActivityFetch(userId, days);
 
             return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ success: true, message: `Enqueued fetch for last ${days} days` }) };
+        }
+
+        // POST /support/contact
+        if (routeKey === 'POST /support/contact') {
+            const { email, subject, details, captchaToken } = JSON.parse(body);
+
+            // 1. Verify reCAPTCHA
+            const isValidCaptcha = await verifyRecaptcha(captchaToken);
+            if (!isValidCaptcha) {
+                const err = new Error('Invalid reCAPTCHA');
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // 2. Validate Fields
+            if (!email || !subject || !details) {
+                const err = new Error('Missing required fields');
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // 3. Send Email
+            await emailService.sendSupportEmail({
+                fromEmail: email,
+                subject,
+                body: details
+            });
+
+            return {
+                statusCode: 200,
+                headers: { "Access-Control-Allow-Origin": "*" },
+                body: JSON.stringify({ success: true, message: 'Support message sent!' })
+            };
         }
 
         // --- Webhook Endpoints ---

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
+import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import stravaConnectBtn from './assets/btn_strava_connectwith_orange.svg';
 import stravaPoweredBy from './assets/api_logo_pwrdBy_strava_horiz_white.svg';
+import Support from './Support';
 import './App.css'
 import ReactGA from 'react-ga4';
 
@@ -29,6 +31,12 @@ function App({ dynamicConfig }) {
       }, 5000);
     }
   };
+
+  const location = useLocation();
+  // Track page view on route change
+  useEffect(() => {
+    ReactGA.send({ hitType: 'pageview', page: location.pathname });
+  }, [location]);
 
   // Check for Strava Callback
   useEffect(() => {
@@ -58,9 +66,6 @@ function App({ dynamicConfig }) {
       setUser(JSON.parse(storedUser));
       fetchCalendars(token);
     }
-
-    // Track initial page view
-    ReactGA.send({ hitType: 'pageview', page: window.location.pathname });
   }, []);
 
   const login = useGoogleLogin({
@@ -277,17 +282,22 @@ function App({ dynamicConfig }) {
   return (
     <div className="app-wrapper">
       <main className="container fade-in-up">
-        <p className="subtitle" style={{ marginTop: '0', fontSize: '1.2rem', color: 'var(--text-muted)', marginBottom: '1.5rem', fontWeight: '400' }}>
-          Clocking <span className="highlight-text">Sweat</span>
-        </p>
-        <h1 className="title" style={{ lineHeight: '1.1', marginBottom: '0.5rem' }}>
-          Sync your Strava activities<br />to Google Calendar.
-        </h1>
         {msg.text && (
-          <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`}>
+          <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`} style={{ marginBottom: '1.5rem' }}>
             {msg.text}
           </div>
         )}
+
+        <Routes>
+          <Route path="/support" element={<Support apiUrl={API_URL} />} />
+          <Route path="/" element={
+            <>
+              <p className="subtitle" style={{ marginTop: '0', fontSize: '1.2rem', color: 'var(--text-muted)', marginBottom: '1.5rem', fontWeight: '400' }}>
+                Clocking <span className="highlight-text">Sweat</span>
+              </p>
+              <h1 className="title" style={{ lineHeight: '1.1', marginBottom: '0.5rem' }}>
+                Sync your Strava activities<br />to Google Calendar.
+              </h1>
 
         {loading ? (
           <div className="loading-spinner fade-in" aria-live="polite">Loading...</div>
@@ -588,8 +598,11 @@ function App({ dynamicConfig }) {
               )}
             </div>
 
-          </section>
-        )}
+              </section>
+            )}
+            </>
+          } />
+        </Routes>
       </main>
 
       {!loading && (
@@ -617,6 +630,8 @@ function App({ dynamicConfig }) {
             </div>
 
             <div className="footer-center">
+              <Link to="/support" className="footer-link">help & support</Link>
+              <span className="footer-separator">|</span>
               <a href="/privacy.html" className="footer-link">privacy policy</a>
               <span className="footer-separator">|</span>
               <a href="/tos.html" className="footer-link">terms of service</a>

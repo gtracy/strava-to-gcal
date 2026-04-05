@@ -93,6 +93,8 @@ export class InfrastructureStack extends cdk.Stack {
         GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
         STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID || '',
         STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
+        SUPPORT_EMAIL_RECIPIENT: process.env.ALERT_EMAIL || '',
+        RECAPTCHA_SECRET_KEY: process.env.RECAPTCHA_SECRET_KEY || '',
       },
     });
 
@@ -101,6 +103,12 @@ export class InfrastructureStack extends cdk.Stack {
 
     // Grant Lambda permissions to DynamoDB Table
     usersTable.grantReadWriteData(stravaSyncLambda);
+
+    // SES Permissions for Support Contact Form
+    stravaSyncLambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'], // Ideally restrict to verified identities/domains in production
+    }));
 
     // 3. HTTP API (API Gateway V2)
     // 3.1 Backend ACM Certificate & Custom Domain
@@ -182,6 +190,12 @@ export class InfrastructureStack extends cdk.Stack {
     httpApi.addRoutes({
       path: '/user',
       methods: ['PATCH' as apigwv2.HttpMethod, 'DELETE' as apigwv2.HttpMethod],
+      integration: lambdaIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/support/contact',
+      methods: [apigwv2.HttpMethod.POST],
       integration: lambdaIntegration,
     });
 
@@ -517,7 +531,7 @@ export class InfrastructureStack extends cdk.Stack {
       },
       securityHeadersBehavior: {
         contentSecurityPolicy: {
-          contentSecurityPolicy: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://*.amazonaws.com https://${apiDomainName} https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-src 'self' https://accounts.google.com/gsi/; img-src 'self' data: https://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com;`,
+          contentSecurityPolicy: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://www.google.com/recaptcha/ https://*.amazonaws.com https://${apiDomainName} https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-src 'self' https://accounts.google.com/gsi/ https://www.google.com/recaptcha/; img-src 'self' data: https://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com;`,
           override: true,
         },
         contentTypeOptions: { override: true },
