@@ -30,8 +30,8 @@ This document outlines the required activities to transition the current persona
 
 ## 4. Frontend Polish & User Experience
 - [ ] **Landing Page Content:** Create content on the current landing page that shows off examples of the service to new, unauthenticated users.
-- [ ] **Support/FAQ:** Add a page or section to help users troubleshoot issues (e.g., "Why didn't my activity sync?").
-- [ ] **Donations:** Integrate donation options for users.
+- [x] **Support/FAQ:** Add a page or section to help users troubleshoot issues (e.g., "Why didn't my activity sync?").
+- [x] **Donations:** Integrate donation options for users.
 - [x] **Footer:** Create a footer that includes references to the creator, the GitHub repo, and the creator's Threads account.
 - [x] **Google Analytics:** Implement Google Analytics to track site traffic and usage.
 - [x] **Favicon:** Add a custom favicon for the site.

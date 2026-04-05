@@ -89,9 +89,9 @@ const Support = ({ apiUrl }) => {
                 </div>
             </section>
 
-            <section className="contact-section">
-                <h2 className="title" style={{ fontSize: '2rem', marginBottom: '1.5rem' }}>Still have <span className="highlight-text">questions?</span></h2>
-                <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '700px' }}>
+            <section className="contact-section" style={{ alignItems: 'flex-start' }}>
+                <h2 className="title" style={{ fontSize: '2rem', marginBottom: '1.5rem', textAlign: 'left' }}>Still have <span className="highlight-text">questions?</span></h2>
+                <div className="glass-panel" style={{ padding: '2.5rem', width: '100%', boxSizing: 'border-box' }}>
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         <div className="form-group">
                             <label htmlFor="email" className="status-title" style={{ display: 'block', marginBottom: '0.5rem' }}>Email Address</label>
@@ -149,6 +149,15 @@ const Support = ({ apiUrl }) => {
                         >
                             {isSubmitting ? 'Sending...' : 'Send Message'}
                         </button>
+                        <p style={{ 
+                            fontSize: '0.75rem', 
+                            color: 'var(--text-muted)', 
+                            textAlign: 'center', 
+                            marginTop: '1rem',
+                            lineHeight: '1.4'
+                        }}>
+                            This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" className="btn-text" style={{ fontSize: '0.75rem', textDecoration: 'underline' }}>Privacy Policy</a> and <a href="https://policies.google.com/terms" className="btn-text" style={{ fontSize: '0.75rem', textDecoration: 'underline' }}>Terms of Service</a> apply.
+                        </p>
                     </form>
                 </div>
             </section>
