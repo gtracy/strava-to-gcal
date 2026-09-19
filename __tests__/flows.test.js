@@ -4,10 +4,12 @@ const deleteFlow = require('../src/flows/delete');
 const stravaService = require('../src/services/strava');
 const googleCalendarService = require('../src/services/googleCalendar');
 const authService = require('../src/services/auth');
+const userRepository = require('../src/repositories/user-repository');
 
 jest.mock('../src/services/strava');
 jest.mock('../src/services/googleCalendar');
 jest.mock('../src/services/auth');
+jest.mock('../src/repositories/user-repository');
 jest.mock('axios'); // Mock the OSM geocoder
 
 const axios = require('axios');
@@ -15,6 +17,8 @@ const axios = require('axios');
 describe('Flows', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        userRepository.markDisconnected.mockResolvedValue();
+        userRepository.saveUser.mockResolvedValue();
         authService.refreshStravaToken.mockResolvedValue({
             access_token: 'new_strava_token',
             refresh_token: 'new_strava_refresh_token'
@@ -97,6 +101,44 @@ describe('Flows', () => {
 
             updateFlow.handleUpdate.mockRestore();
         });
+
+        it('should mark user disconnected and return cleanly if Google Calendar returns 403 during findEvent', async () => {
+            const permError = new Error('Insufficient Permission');
+            permError.status = 403;
+            googleCalendarService.findEventByStravaId.mockRejectedValueOnce(permError);
+
+            await expect(createFlow.handleCreate(mockUser, 123)).resolves.not.toThrow();
+            expect(userRepository.markDisconnected).toHaveBeenCalledWith(mockUser.googleUserId, 'google');
+            expect(googleCalendarService.createEvent).not.toHaveBeenCalled();
+        });
+
+        it('should gracefully skip sync if Strava returns 404', async () => {
+            googleCalendarService.findEventByStravaId.mockResolvedValue(null);
+            const notFoundError = new Error('Not Found');
+            notFoundError.status = 404;
+            stravaService.getActivity.mockRejectedValueOnce(notFoundError);
+
+            await expect(createFlow.handleCreate(mockUser, 123)).resolves.not.toThrow();
+            expect(googleCalendarService.createEvent).not.toHaveBeenCalled();
+        });
+
+        it('should mark user disconnected and return cleanly if Google Calendar returns 403 during createEvent', async () => {
+            googleCalendarService.findEventByStravaId.mockResolvedValue(null);
+            stravaService.getActivity.mockResolvedValue({
+                id: 123,
+                name: 'Test Run',
+                type: 'Run',
+                start_date: '2023-01-01T10:00:00Z',
+                elapsed_time: 3600,
+                distance: 10000
+            });
+            const permError = new Error('Insufficient Permission');
+            permError.code = 403;
+            googleCalendarService.createEvent.mockRejectedValueOnce(permError);
+
+            await expect(createFlow.handleCreate(mockUser, 123)).resolves.not.toThrow();
+            expect(userRepository.markDisconnected).toHaveBeenCalledWith(mockUser.googleUserId, 'google');
+        });
     });
 
     describe('Update Flow', () => {
@@ -125,7 +167,42 @@ describe('Flows', () => {
             );
         });
 
+        it('should mark user disconnected and return cleanly if Google Calendar returns 403 during findEvent', async () => {
+            const permError = new Error('Insufficient Permission');
+            permError.status = 403;
+            googleCalendarService.findEventByStravaId.mockRejectedValueOnce(permError);
 
+            await expect(updateFlow.handleUpdate(mockUser, 123, {})).resolves.not.toThrow();
+            expect(userRepository.markDisconnected).toHaveBeenCalledWith(mockUser.googleUserId, 'google');
+        });
+
+        it('should gracefully skip sync if Strava returns 404 during update', async () => {
+            googleCalendarService.findEventByStravaId.mockResolvedValue({ id: 'evt1' });
+            const notFoundError = new Error('Not Found');
+            notFoundError.status = 404;
+            stravaService.getActivity.mockRejectedValueOnce(notFoundError);
+
+            await expect(updateFlow.handleUpdate(mockUser, 123, {})).resolves.not.toThrow();
+            expect(googleCalendarService.patchEvent).not.toHaveBeenCalled();
+        });
+
+        it('should mark user disconnected and return cleanly if Google Calendar returns 403 during patchEvent', async () => {
+            googleCalendarService.findEventByStravaId.mockResolvedValue({ id: 'evt1' });
+            stravaService.getActivity.mockResolvedValue({
+                id: 123,
+                name: 'Updated Run',
+                type: 'Run',
+                start_date: '2023-01-01T10:00:00Z',
+                elapsed_time: 3600,
+                distance: 10000
+            });
+            const permError = new Error('Insufficient Permission');
+            permError.status = 403;
+            googleCalendarService.patchEvent.mockRejectedValueOnce(permError);
+
+            await expect(updateFlow.handleUpdate(mockUser, 123, {})).resolves.not.toThrow();
+            expect(userRepository.markDisconnected).toHaveBeenCalledWith(mockUser.googleUserId, 'google');
+        });
     });
 
     describe('Delete Flow', () => {
@@ -145,6 +222,25 @@ describe('Flows', () => {
             await deleteFlow.handleDelete(mockUser, 123);
 
             expect(googleCalendarService.deleteEvent).not.toHaveBeenCalled();
+        });
+
+        it('should mark user disconnected and return cleanly if Google Calendar returns 403 during findEvent in delete', async () => {
+            const permError = new Error('Insufficient Permission');
+            permError.status = 403;
+            googleCalendarService.findEventByStravaId.mockRejectedValueOnce(permError);
+
+            await expect(deleteFlow.handleDelete(mockUser, 123)).resolves.not.toThrow();
+            expect(userRepository.markDisconnected).toHaveBeenCalledWith(mockUser.googleUserId, 'google');
+        });
+
+        it('should mark user disconnected and return cleanly if Google Calendar returns 403 during deleteEvent', async () => {
+            googleCalendarService.findEventByStravaId.mockResolvedValue({ id: 'evt1' });
+            const permError = new Error('Insufficient Permission');
+            permError.status = 403;
+            googleCalendarService.deleteEvent.mockRejectedValueOnce(permError);
+
+            await expect(deleteFlow.handleDelete(mockUser, 123)).resolves.not.toThrow();
+            expect(userRepository.markDisconnected).toHaveBeenCalledWith(mockUser.googleUserId, 'google');
         });
     });
 });

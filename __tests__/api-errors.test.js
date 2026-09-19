@@ -1,4 +1,4 @@
-const { isTokenRevocationError, isRateLimitError } = require('../src/utils/api-errors');
+const { isTokenRevocationError, isRateLimitError, isGooglePermissionError } = require('../src/utils/api-errors');
 
 describe('API Errors Utility', () => {
     describe('isTokenRevocationError', () => {
@@ -32,6 +32,41 @@ describe('API Errors Utility', () => {
         it('returns false for other errors', () => {
             const error = { response: { status: 400 } };
             expect(isRateLimitError(error)).toBe(false);
+        });
+    });
+
+    describe('isGooglePermissionError', () => {
+        it('identifies 403 with Insufficient Permission message', () => {
+            const error = { status: 403, message: 'Insufficient Permission' };
+            expect(isGooglePermissionError(error)).toBe(true);
+        });
+
+        it('identifies 403 with insufficientPermissions reason', () => {
+            const error = {
+                code: 403,
+                errors: [{ reason: 'insufficientPermissions' }]
+            };
+            expect(isGooglePermissionError(error)).toBe(true);
+        });
+
+        it('identifies 403 with ACCESS_TOKEN_SCOPE_INSUFFICIENT detail', () => {
+            const error = {
+                response: {
+                    status: 403,
+                    data: {
+                        error: {
+                            message: 'Request had insufficient authentication scopes.',
+                            errors: [{ reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' }]
+                        }
+                    }
+                }
+            };
+            expect(isGooglePermissionError(error)).toBe(true);
+        });
+
+        it('returns false for non-403 errors', () => {
+            const error = { status: 404, message: 'Not Found' };
+            expect(isGooglePermissionError(error)).toBe(false);
         });
     });
 });

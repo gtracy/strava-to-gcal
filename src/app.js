@@ -90,6 +90,18 @@ exports.handler = async (event) => {
             // 1. Exchange Code for Tokens
             const tokens = await authService.exchangeGoogleCode(code, redirectUri); // Contains access_token, refresh_token, id_token
 
+            // Verify Google Calendar permissions scope
+            if (tokens.scope && !tokens.scope.includes('https://www.googleapis.com/auth/calendar.events')) {
+                logger.warn({ scope: tokens.scope }, 'Google authentication rejected: insufficient calendar permissions');
+                return {
+                    statusCode: 403,
+                    headers: { "Access-Control-Allow-Origin": "*" },
+                    body: JSON.stringify({
+                        error: 'Google Calendar permission was not granted. Please ensure calendar access is allowed when signing in.'
+                    })
+                };
+            }
+
             // 2. Verify ID Token from the exchange
             if (!tokens.id_token) {
                 const err = new Error('No ID Token in Google token exchange');
@@ -246,7 +258,23 @@ exports.handler = async (event) => {
             );
             googleAuthClient.setCredentials(googleCredentials);
 
-            const calendars = await googleCalendarService.listCalendars(googleAuthClient);
+            let calendars;
+            try {
+                calendars = await googleCalendarService.listCalendars(googleAuthClient);
+            } catch (error) {
+                if (error.code === 403 || error.status === 403 || error.message?.includes('Insufficient Permission')) {
+                    logger.warn({ googleUserId, errMessage: error.message }, 'Failed to list calendars due to insufficient permissions');
+                    return {
+                        statusCode: 403,
+                        headers: { "Access-Control-Allow-Origin": "*" },
+                        body: JSON.stringify({
+                            error: 'insufficient_calendar_permissions',
+                            message: 'Google Calendar permission is missing or revoked.'
+                        })
+                    };
+                }
+                throw error;
+            }
             return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(calendars) };
         }
 
@@ -286,7 +314,23 @@ exports.handler = async (event) => {
             googleAuthClient.setCredentials(googleCredentials);
 
             // Create Calendar
-            const newCalendar = await googleCalendarService.createCalendar(googleAuthClient, 'Strava');
+            let newCalendar;
+            try {
+                newCalendar = await googleCalendarService.createCalendar(googleAuthClient, 'Strava');
+            } catch (error) {
+                if (error.code === 403 || error.status === 403 || error.message?.includes('Insufficient Permission')) {
+                    logger.warn({ googleUserId, errMessage: error.message }, 'Failed to create calendar due to insufficient permissions');
+                    return {
+                        statusCode: 403,
+                        headers: { "Access-Control-Allow-Origin": "*" },
+                        body: JSON.stringify({
+                            error: 'insufficient_calendar_permissions',
+                            message: 'Google Calendar permission is missing or revoked.'
+                        })
+                    };
+                }
+                throw error;
+            }
 
             // Auto Select it for the user
             user.selectedCalendarId = newCalendar.id;

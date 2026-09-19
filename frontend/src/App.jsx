@@ -21,6 +21,7 @@ function App({ dynamicConfig }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [calendarPermissionDenied, setCalendarPermissionDenied] = useState(false);
 
   const showMessage = (text, type = 'error') => {
     setMsg({ text, type, fading: false });
@@ -70,6 +71,12 @@ function App({ dynamicConfig }) {
 
   const login = useGoogleLogin({
     onSuccess: async (codeResponse) => {
+      // 1. Verify granted scope if returned by Google
+      if (codeResponse.scope && !codeResponse.scope.includes('calendar.events')) {
+        showMessage('Google Calendar permission was not granted. Please sign in again and check the box allowing calendar access.', 'error');
+        return;
+      }
+
       setLoading(true);
       try {
         const res = await axios.post(`${API_URL}/auth/google`, {
@@ -78,6 +85,7 @@ function App({ dynamicConfig }) {
         });
 
         setUser(res.data.user);
+        setCalendarPermissionDenied(false);
         localStorage.setItem('strava_gcal_user', JSON.stringify(res.data.user));
         if (res.data.token) {
           localStorage.setItem('strava_gcal_token', res.data.token);
@@ -94,13 +102,14 @@ function App({ dynamicConfig }) {
       } catch (err) {
         console.error(err);
         const errorMsg = err.response?.data?.error || 'Login Failed';
-        showMessage(errorMsg);
+        showMessage(errorMsg, 'error');
       } finally {
         setLoading(false);
       }
     },
-    onError: () => showMessage('Google Login Failed'),
+    onError: () => showMessage('Google Login Failed', 'error'),
     flow: 'auth-code',
+    prompt: 'consent',
     scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',
   });
 
@@ -113,6 +122,7 @@ function App({ dynamicConfig }) {
       });
       const fetchedCalendars = res.data;
       setCalendars(fetchedCalendars);
+      setCalendarPermissionDenied(false);
 
       const stravaCal = fetchedCalendars.find(c => c.summary.toLowerCase() === 'strava');
 
@@ -134,6 +144,11 @@ function App({ dynamicConfig }) {
       });
     } catch (err) {
       console.error("Failed to fetch calendars", err);
+      if (err.response?.status === 403 || err.response?.data?.error === 'insufficient_calendar_permissions') {
+        setCalendarPermissionDenied(true);
+        showMessage('Google Calendar access permission is missing or revoked. Please grant access.', 'error');
+        return;
+      }
       if (err.response?.status === 401 || err.response?.status === 404) {
         handleLogout();
       }
@@ -175,6 +190,7 @@ function App({ dynamicConfig }) {
 
   const handleLogout = (message = '', type = 'error') => {
     setUser(null);
+    setCalendarPermissionDenied(false);
     localStorage.removeItem('strava_gcal_user');
     localStorage.removeItem('strava_gcal_token');
     if (message) showMessage(message, type);
@@ -381,8 +397,21 @@ function App({ dynamicConfig }) {
               </div>
             </div>
 
-            <div className="card-item fade-in-up" style={{ animationDelay: '0.3s' }}>
-              {!isEditingCalendar ? (
+            <div className="card-item fade-in-up" style={{ animationDelay: '0.3s', ...(calendarPermissionDenied ? { borderColor: 'rgba(234, 67, 53, 0.4)', background: 'rgba(234, 67, 53, 0.05)' } : {}) }}>
+              {calendarPermissionDenied ? (
+                <div className="connect-action" style={{ width: '100%' }}>
+                  <span className="icon" style={{ color: '#ea4335' }} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                  </span>
+                  <div className="status-text">
+                    <span className="status-title" style={{ color: '#ea4335' }}>Calendar Access Required</span>
+                    <span className="status-desc">Google Calendar permission was not granted or was revoked. Please grant access to sync activities.</span>
+                  </div>
+                  <button className="btn-primary" style={{ padding: '0.5em 1em', fontSize: '0.85rem', backgroundColor: '#ea4335', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => login()}>
+                    Grant Access
+                  </button>
+                </div>
+              ) : !isEditingCalendar ? (
                 <>
                   <span className="icon success-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -529,7 +558,9 @@ function App({ dynamicConfig }) {
                   <div className="status-text">
                     <span className="status-title">Hello, {user.firstName || 'there'}!</span>
                     <span className="status-desc" style={{ fontSize: '0.95rem', lineHeight: '1.4' }}>
-                      {user.hasStrava
+                      {calendarPermissionDenied
+                        ? "Action required: Please grant Google Calendar access above so your Strava activities can sync."
+                        : user.hasStrava
                         ? "You are all setup! Data will flow seamlessly in the background and there's nothing left for you to do."
                         : "Connect your Strava account above to finalize the setup."}
                     </span>

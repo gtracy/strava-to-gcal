@@ -3,7 +3,7 @@ const authService = require('../services/auth');
 const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
-const { TokenRevokedError } = require('../utils/api-errors');
+const { TokenRevokedError, isGooglePermissionError } = require('../utils/api-errors');
 
 async function handleDelete(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling delete flow');
@@ -46,14 +46,34 @@ async function handleDelete(user, stravaActivityId) {
     }
 
     const calendarId = user.selectedCalendarId || 'primary';
-    const existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
+    let existingEvent;
+    try {
+        existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
+    } catch (error) {
+        if (isGooglePermissionError(error)) {
+            logger.warn({ googleUserId: user.googleUserId, stravaActivityId, errMessage: error.message }, 'Google Calendar permission denied during findEvent in delete, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, 'google');
+            return;
+        }
+        throw error;
+    }
+
     if (!existingEvent) {
         logger.info({ stravaActivityId }, 'Event not found, nothing to delete');
         return;
     }
 
-    await googleCalendarService.deleteEvent(googleAuthClient, existingEvent.id, calendarId);
-    logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Successfully deleted Google Calendar event');
+    try {
+        await googleCalendarService.deleteEvent(googleAuthClient, existingEvent.id, calendarId);
+        logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Successfully deleted Google Calendar event');
+    } catch (error) {
+        if (isGooglePermissionError(error)) {
+            logger.warn({ googleUserId: user.googleUserId, stravaActivityId, errMessage: error.message }, 'Google Calendar permission denied during deleteEvent, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, 'google');
+            return;
+        }
+        throw error;
+    }
 }
 
 module.exports = { handleDelete };

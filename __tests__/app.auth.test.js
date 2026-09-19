@@ -2,10 +2,12 @@ process.env.JWT_SECRET = 'test-secret';
 const app = require('../src/app');
 const authService = require('../src/services/auth');
 const userRepository = require('../src/repositories/user-repository');
+const googleCalendarService = require('../src/services/googleCalendar');
 const jwt = require('jsonwebtoken');
 
 jest.mock('../src/services/auth');
 jest.mock('../src/repositories/user-repository');
+jest.mock('../src/services/googleCalendar');
 
 describe('Auth Endpoints', () => {
     beforeEach(() => {
@@ -112,5 +114,51 @@ describe('Auth Endpoints', () => {
         expect(authService.revokeGoogleToken).toHaveBeenCalledWith('google_refresh');
         expect(authService.revokeStravaToken).toHaveBeenCalledWith('strava_access');
         expect(userRepository.deleteUser).toHaveBeenCalledWith('12345');
+    });
+
+    it('POST /auth/google should reject with 403 when calendar.events scope is missing', async () => {
+        authService.exchangeGoogleCode.mockResolvedValue({
+            access_token: 'google_access',
+            id_token: 'google_id',
+            scope: 'openid email profile'
+        });
+
+        const event = {
+            routeKey: 'POST /auth/google',
+            body: JSON.stringify({ code: 'test_code', redirectUri: 'http://localhost' })
+        };
+
+        const response = await app.handler(event);
+        expect(response.statusCode).toBe(403);
+        const body = JSON.parse(response.body);
+        expect(body.error).toContain('Google Calendar permission was not granted');
+        expect(userRepository.saveUser).not.toHaveBeenCalled();
+    });
+
+    it('GET /user/calendars should return 403 when Google Calendar throws insufficient permissions', async () => {
+        const token = jwt.sign({ googleUserId: '12345' }, 'test-secret');
+        userRepository.getUserByGoogleId.mockResolvedValue({
+            googleUserId: '12345',
+            googleRefreshToken: 'refresh_123'
+        });
+        authService.refreshGoogleToken.mockResolvedValue({
+            access_token: 'new_token'
+        });
+        googleCalendarService.listCalendars.mockRejectedValue({
+            code: 403,
+            message: 'Insufficient Permission'
+        });
+
+        const event = {
+            routeKey: 'GET /user/calendars',
+            headers: {
+                authorization: `Bearer ${token}`
+            }
+        };
+
+        const response = await app.handler(event);
+        expect(response.statusCode).toBe(403);
+        const body = JSON.parse(response.body);
+        expect(body.error).toBe('insufficient_calendar_permissions');
     });
 });

@@ -47,4 +47,22 @@ function isRateLimitError(error) {
     return status === 429;
 }
 
-module.exports = { TokenRevokedError, isTokenRevocationError, RateLimitError, isRateLimitError };
+/**
+ * Checks if a Google Calendar API error indicates missing or revoked permissions (403).
+ */
+function isGooglePermissionError(error) {
+    const status = error.code || error.status || error.response?.status;
+    if (status === 403) {
+        const message = error.message || error.response?.data?.error?.message || '';
+        if (message.includes('Insufficient Permission') || message.includes('insufficient') || message.includes('PERMISSION_DENIED')) {
+            return true;
+        }
+        const reason = error.errors?.[0]?.reason || error.response?.data?.error?.errors?.[0]?.reason;
+        if (reason === 'insufficientPermissions' || reason === 'ACCESS_TOKEN_SCOPE_INSUFFICIENT') {
+            return true;
+        }
+    }
+    return false;
+}
+
+module.exports = { TokenRevokedError, isTokenRevocationError, RateLimitError, isRateLimitError, isGooglePermissionError };

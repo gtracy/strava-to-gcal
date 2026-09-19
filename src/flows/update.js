@@ -5,7 +5,7 @@ const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
 const { buildEventDescription, buildEventLocation } = require('../utils/strava-formatter');
-const { TokenRevokedError } = require('../utils/api-errors');
+const { TokenRevokedError, isGooglePermissionError } = require('../utils/api-errors');
 
 async function handleUpdate(user, stravaActivityId, updates) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId, updates }, 'Handling update flow');
@@ -75,7 +75,18 @@ async function handleUpdate(user, stravaActivityId, updates) {
 
     // 2. Locate Event
     const calendarId = user.selectedCalendarId || 'primary';
-    const existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
+    let existingEvent;
+    try {
+        existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
+    } catch (error) {
+        if (isGooglePermissionError(error)) {
+            logger.warn({ googleUserId: user.googleUserId, stravaActivityId, errMessage: error.message }, 'Google Calendar permission denied during findEvent, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, 'google');
+            return;
+        }
+        throw error;
+    }
+
     if (!existingEvent) {
         logger.warn({ stravaActivityId }, 'Event not found for update, skipping');
         return;
@@ -91,6 +102,10 @@ async function handleUpdate(user, stravaActivityId, updates) {
             country: activity.location_country
         }, 'Raw Strava Activity Location Fields');
     } catch (error) {
+        if (error.status === 404 || error.response?.status === 404) {
+            logger.info({ stravaActivityId, googleUserId: user.googleUserId }, 'Strava activity not found (already deleted), skipping update sync');
+            return;
+        }
         logger.error({ errMessage: error.message, status: error.status || error.response?.status, stravaActivityId }, 'Failed to fetch activity from Strava');
         throw error;
     }
@@ -115,8 +130,17 @@ async function handleUpdate(user, stravaActivityId, updates) {
         },
     };
 
-    await googleCalendarService.patchEvent(googleAuthClient, existingEvent.id, eventUpdates, calendarId);
-    logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Successfully updated Google Calendar event');
+    try {
+        await googleCalendarService.patchEvent(googleAuthClient, existingEvent.id, eventUpdates, calendarId);
+        logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Successfully updated Google Calendar event');
+    } catch (error) {
+        if (isGooglePermissionError(error)) {
+            logger.warn({ googleUserId: user.googleUserId, stravaActivityId, errMessage: error.message }, 'Google Calendar permission denied during patchEvent, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, 'google');
+            return;
+        }
+        throw error;
+    }
 }
 
 module.exports = { handleUpdate };

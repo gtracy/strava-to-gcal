@@ -5,7 +5,7 @@ const userRepository = require('../repositories/user-repository');
 const logger = require('../logger');
 const { google } = require('googleapis');
 const { buildEventDescription, buildEventLocation } = require('../utils/strava-formatter');
-const { TokenRevokedError } = require('../utils/api-errors');
+const { TokenRevokedError, isGooglePermissionError } = require('../utils/api-errors');
 
 async function handleCreate(user, stravaActivityId) {
     logger.debug({ stravaActivityId, googleUserId: user.googleUserId }, 'Handling create flow');
@@ -68,7 +68,18 @@ async function handleCreate(user, stravaActivityId) {
 
     // 1. Check Idempotency
     const calendarId = user.selectedCalendarId || 'primary';
-    const existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
+    let existingEvent;
+    try {
+        existingEvent = await googleCalendarService.findEventByStravaId(googleAuthClient, stravaActivityId, calendarId);
+    } catch (error) {
+        if (isGooglePermissionError(error)) {
+            logger.warn({ googleUserId: user.googleUserId, stravaActivityId, errMessage: error.message }, 'Google Calendar permission denied during findEvent, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, 'google');
+            return;
+        }
+        throw error;
+    }
+
     if (existingEvent) {
         logger.info({ stravaActivityId, eventId: existingEvent.id }, 'Event already exists, routing to update flow to force sync');
         const updateFlow = require('./update');
@@ -81,6 +92,10 @@ async function handleCreate(user, stravaActivityId) {
     try {
         activity = await stravaService.getActivity(stravaAccessToken, stravaActivityId);
     } catch (error) {
+        if (error.status === 404 || error.response?.status === 404) {
+            logger.info({ stravaActivityId, googleUserId: user.googleUserId }, 'Strava activity not found (already deleted), skipping create sync');
+            return;
+        }
         logger.error({ errMessage: error.message, status: error.status || error.response?.status, stravaActivityId }, 'Failed to fetch activity from Strava');
         throw error;
     }
@@ -114,6 +129,11 @@ async function handleCreate(user, stravaActivityId) {
             logger.info({ stravaActivityId }, 'Event creation conflicted (409), another worker already created it. Falling back to update flow.');
             const updateFlow = require('./update');
             await updateFlow.handleUpdate(user, stravaActivityId, { force: true });
+            return;
+        }
+        if (isGooglePermissionError(error)) {
+            logger.warn({ googleUserId: user.googleUserId, stravaActivityId, errMessage: error.message }, 'Google Calendar permission denied during createEvent, marking user as disconnected');
+            await userRepository.markDisconnected(user.googleUserId, 'google');
             return;
         }
         throw error;
