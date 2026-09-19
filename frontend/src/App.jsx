@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
@@ -23,14 +23,73 @@ function App({ dynamicConfig }) {
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [calendarPermissionDenied, setCalendarPermissionDenied] = useState(false);
 
-  const showMessage = (text, type = 'error') => {
+  const msgTimeoutRef = useRef(null);
+  const fadeTimeoutRef = useRef(null);
+
+  const clearMessage = () => {
+    if (msgTimeoutRef.current) clearTimeout(msgTimeoutRef.current);
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    setMsg({ text: '', type: 'error', fading: false });
+  };
+
+  const showMessage = (text, type = 'error', duration = type === 'success' ? 5000 : 8000) => {
+    if (msgTimeoutRef.current) clearTimeout(msgTimeoutRef.current);
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
     setMsg({ text, type, fading: false });
-    if (type === 'success') {
-      setTimeout(() => {
+    if (duration > 0) {
+      msgTimeoutRef.current = setTimeout(() => {
         setMsg(prev => ({ ...prev, fading: true }));
-        setTimeout(() => setMsg({ text: '', type: 'error', fading: false }), 500);
-      }, 5000);
+        fadeTimeoutRef.current = setTimeout(() => {
+          setMsg({ text: '', type: 'error', fading: false });
+        }, 500);
+      }, duration);
     }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (msgTimeoutRef.current) clearTimeout(msgTimeoutRef.current);
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    };
+  }, []);
+
+  const renderAlert = (extraStyle = {}) => {
+    if (!msg.text) return null;
+    return (
+      <div
+        role="alert"
+        className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          marginBottom: 0,
+          ...extraStyle
+        }}
+      >
+        <span style={{ flex: 1, textAlign: 'center' }}>{msg.text}</span>
+        <button
+          type="button"
+          onClick={clearMessage}
+          aria-label="Dismiss message"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'inherit',
+            cursor: 'pointer',
+            fontSize: '1.25rem',
+            lineHeight: 1,
+            padding: '0 0.25rem',
+            opacity: 0.7,
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
+        >
+          &times;
+        </button>
+      </div>
+    );
   };
 
   const location = useLocation();
@@ -77,6 +136,7 @@ function App({ dynamicConfig }) {
         return;
       }
 
+      clearMessage();
       setLoading(true);
       try {
         const res = await axios.post(`${API_URL}/auth/google`, {
@@ -86,6 +146,7 @@ function App({ dynamicConfig }) {
 
         setUser(res.data.user);
         setCalendarPermissionDenied(false);
+        clearMessage();
         localStorage.setItem('strava_gcal_user', JSON.stringify(res.data.user));
         if (res.data.token) {
           localStorage.setItem('strava_gcal_token', res.data.token);
@@ -113,6 +174,11 @@ function App({ dynamicConfig }) {
     scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',
   });
 
+  const handleGoogleSignIn = () => {
+    clearMessage();
+    login();
+  };
+
   const fetchCalendars = async (tokenOverride) => {
     try {
       const token = tokenOverride || localStorage.getItem('strava_gcal_token');
@@ -123,6 +189,7 @@ function App({ dynamicConfig }) {
       const fetchedCalendars = res.data;
       setCalendars(fetchedCalendars);
       setCalendarPermissionDenied(false);
+      clearMessage();
 
       const stravaCal = fetchedCalendars.find(c => c.summary.toLowerCase() === 'strava');
 
@@ -156,6 +223,7 @@ function App({ dynamicConfig }) {
   };
 
   const createCalendar = async () => {
+    clearMessage();
     setLoading(true);
     try {
       const token = localStorage.getItem('strava_gcal_token');
@@ -193,13 +261,18 @@ function App({ dynamicConfig }) {
     setCalendarPermissionDenied(false);
     localStorage.removeItem('strava_gcal_user');
     localStorage.removeItem('strava_gcal_token');
-    if (message) showMessage(message, type);
+    if (message) {
+      showMessage(message, type);
+    } else {
+      clearMessage();
+    }
     setDeleteConfirmed(false);
     setShowDeleteModal(false);
   };
 
   const handleDeleteAccount = async () => {
     if (!deleteConfirmed) return;
+    clearMessage();
     setIsDeleting(true);
     setLoading(true);
     try {
@@ -230,6 +303,7 @@ function App({ dynamicConfig }) {
   };
 
   const handleCalendarChange = async (e) => {
+    clearMessage();
     const newCalendarId = e.target.value;
     const prevCalendarId = user.selectedCalendarId;
     try {
@@ -256,6 +330,7 @@ function App({ dynamicConfig }) {
   };
 
   const linkStrava = async (googleUserId, code) => {
+    clearMessage();
     setLoading(true);
     try {
       const token = localStorage.getItem('strava_gcal_token');
@@ -291,6 +366,7 @@ function App({ dynamicConfig }) {
   };
 
   const handleStravaConnect = () => {
+    clearMessage();
     const stravaUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=read,activity:read_all`;
     window.location.href = stravaUrl;
   };
@@ -343,17 +419,13 @@ function App({ dynamicConfig }) {
               </ol>
             </div>
 
-            {msg.text && (
-              <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`} style={{ marginBottom: 0 }}>
-                {msg.text}
-              </div>
-            )}
+            {renderAlert()}
 
             <div className="login-card glass-panel" style={{ marginTop: '0' }}>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Sign in with Google to get started</p>
               <div style={{ marginTop: '1rem' }}>
                 <button
-                  onClick={() => login()}
+                  onClick={handleGoogleSignIn}
                   className="btn btn-primary"
                   aria-label="Continue with Google"
                   style={{
@@ -386,11 +458,7 @@ function App({ dynamicConfig }) {
           </section>
         ) : (
           <section className="dashboard glass-panel fade-in-up" style={{ animationDelay: '0.1s' }}>
-            {msg.text && (
-              <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`} style={{ maxWidth: '100%', marginBottom: 0 }}>
-                {msg.text}
-              </div>
-            )}
+            {renderAlert({ maxWidth: '100%' })}
 
             <div className="card-item fade-in-up" style={{ animationDelay: '0.2s' }}>
               <span className="icon success-icon" aria-hidden="true">
@@ -412,7 +480,7 @@ function App({ dynamicConfig }) {
                     <span className="status-title" style={{ color: '#ea4335' }}>Calendar Access Required</span>
                     <span className="status-desc">Google Calendar permission was not granted or was revoked. Please grant access to sync activities.</span>
                   </div>
-                  <button className="btn-primary" style={{ padding: '0.5em 1em', fontSize: '0.85rem', backgroundColor: '#ea4335', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => login()}>
+                  <button className="btn-primary" style={{ padding: '0.5em 1em', fontSize: '0.85rem', backgroundColor: '#ea4335', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleGoogleSignIn}>
                     Grant Access
                   </button>
                 </div>
