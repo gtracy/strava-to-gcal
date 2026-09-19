@@ -298,12 +298,6 @@ function App({ dynamicConfig }) {
   return (
     <div className="app-wrapper">
       <main className="container fade-in-up">
-        {msg.text && (
-          <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`} style={{ marginBottom: '1.5rem' }}>
-            {msg.text}
-          </div>
-        )}
-
         <Routes>
           <Route path="/support" element={<Support apiUrl={API_URL} />} />
           <Route path="/" element={
@@ -349,6 +343,12 @@ function App({ dynamicConfig }) {
               </ol>
             </div>
 
+            {msg.text && (
+              <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`} style={{ marginBottom: 0 }}>
+                {msg.text}
+              </div>
+            )}
+
             <div className="login-card glass-panel" style={{ marginTop: '0' }}>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Sign in with Google to get started</p>
               <div style={{ marginTop: '1rem' }}>
@@ -386,6 +386,11 @@ function App({ dynamicConfig }) {
           </section>
         ) : (
           <section className="dashboard glass-panel fade-in-up" style={{ animationDelay: '0.1s' }}>
+            {msg.text && (
+              <div role="alert" className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'} ${msg.fading ? 'fade-out-shrink' : 'fade-in'}`} style={{ maxWidth: '100%', marginBottom: 0 }}>
+                {msg.text}
+              </div>
+            )}
 
             <div className="card-item fade-in-up" style={{ animationDelay: '0.2s' }}>
               <span className="icon success-icon" aria-hidden="true">

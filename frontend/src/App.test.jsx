@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -10,7 +11,11 @@ vi.mock('@react-oauth/google', () => ({
 
 describe('App', () => {
     it('renders without crashing', () => {
-        render(<App />);
+        render(
+            <MemoryRouter>
+                <App />
+            </MemoryRouter>
+        );
         expect(screen.getByText(/Continue with Google/i)).toBeInTheDocument();
     });
 });
