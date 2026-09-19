@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   test:
@@ -27,6 +28,9 @@ jobs:
 
       - name: Run backend tests
         run: npm test
+
+      - name: Run frontend tests
+        run: cd frontend && npm test -- --run
 
   deploy:
     name: Deploy to AWS
