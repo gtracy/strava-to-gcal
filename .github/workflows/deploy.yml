@@ -70,12 +70,33 @@ jobs:
               "GOOGLE_CLIENT_SECRET": "${{ secrets.GOOGLE_CLIENT_SECRET }}",
               "KMS_KEY_ID": "${{ secrets.KMS_KEY_ID }}",
               "ALERT_EMAIL": "${{ secrets.ALERT_EMAIL }}",
+              "RECAPTCHA_SECRET_KEY": "${{ secrets.RECAPTCHA_SECRET_KEY }}",
               "USERS_TABLE_NAME": "StravaGcal-Users",
               "LOG_LEVEL": "info",
               "AWS_REGION": "${{ secrets.AWS_REGION }}"
             }
           }
           ENVEOF
+
+      - name: Validate secrets in env.json
+        run: |
+          node -e '
+            const fs = require("fs");
+            const env = JSON.parse(fs.readFileSync("env.json", "utf8")).StravaSyncFunction || {};
+            const required = [
+              "STRAVA_CLIENT_ID",
+              "STRAVA_CLIENT_SECRET",
+              "GOOGLE_CLIENT_ID",
+              "GOOGLE_CLIENT_SECRET",
+              "KMS_KEY_ID"
+            ];
+            const missing = required.filter(k => !env[k] || env[k].trim() === "");
+            if (missing.length > 0) {
+              console.error("FATAL: The following required secrets are missing or empty in env.json:", missing.join(", "));
+              process.exit(1);
+            }
+            console.log("All critical deployment secrets are present.");
+          '
 
       - name: Build frontend
         run: npm run build:frontend

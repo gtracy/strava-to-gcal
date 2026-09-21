@@ -392,6 +392,8 @@ export class InfrastructureStack extends cdk.Stack {
     // Existing App/Webhook Router needs to push to Sync Queue & Fetch Queue
     activitySyncQueue.grantSendMessages(stravaSyncLambda);
     stravaSyncLambda.addEnvironment('SYNC_QUEUE_URL', activitySyncQueue.queueUrl);
+    activityFetchQueue.grantSendMessages(stravaSyncLambda);
+    stravaSyncLambda.addEnvironment('FETCH_QUEUE_URL', activityFetchQueue.queueUrl);
     // Enable metric filters on Log Groups
     // We have to specify the default CDK log group names since we used logRetention on the functions
     const attachMetricFilter = (lambdaFn: NodejsFunction, id: string) => {
@@ -531,7 +533,7 @@ export class InfrastructureStack extends cdk.Stack {
       },
       securityHeadersBehavior: {
         contentSecurityPolicy: {
-          contentSecurityPolicy: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://www.google.com/recaptcha/ https://*.amazonaws.com https://${apiDomainName} https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-src 'self' https://accounts.google.com/gsi/ https://www.google.com/recaptcha/; img-src 'self' data: https://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com;`,
+          contentSecurityPolicy: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://www.google.com/recaptcha/ https://*.google.com https://www.google.com https://*.amazonaws.com https://${apiDomainName} https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-src 'self' https://accounts.google.com/gsi/ https://www.google.com/recaptcha/; img-src 'self' data: https://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com;`,
           override: true,
         },
         contentTypeOptions: { override: true },
