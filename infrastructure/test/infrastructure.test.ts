@@ -14,3 +14,16 @@ test('Lambda log groups are configured with 90-day retention', () => {
     RetentionInDays: 90,
   }, 3);
 });
+
+test('AlertsTopic has an email subscription configured', () => {
+  const app = new cdk.App();
+  const stack = new Infrastructure.InfrastructureStack(app, 'MyTestStackAlerts', {
+    env: { account: '123456789012', region: 'us-east-2' },
+  });
+  const template = Template.fromStack(stack);
+
+  template.hasResourceProperties('AWS::SNS::Subscription', {
+    Protocol: 'email',
+    Endpoint: 'gtracy+stravagcal@gmail.com',
+  });
+});

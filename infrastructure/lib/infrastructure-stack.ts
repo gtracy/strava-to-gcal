@@ -262,6 +262,11 @@ export class InfrastructureStack extends cdk.Stack {
       topicName: 'StravaGcal-AlertsTopic',
     });
 
+    const alertEmail = process.env.ALERT_EMAIL || 'gtracy+stravagcal@gmail.com';
+    if (alertEmail) {
+      alertsTopic.addSubscription(new subscriptions.EmailSubscription(alertEmail));
+    }
+
     const activityFetchDLQ = new sqs.Queue(this, 'ActivityFetchDLQ', {
       queueName: 'StravaGcal-ActivityFetchDLQ',
       retentionPeriod: cdk.Duration.days(14),
