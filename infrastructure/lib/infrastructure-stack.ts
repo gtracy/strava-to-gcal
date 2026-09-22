@@ -44,6 +44,9 @@ export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const projectRoot = path.resolve(__dirname, '../../');
+    const depsLockFilePath = path.join(projectRoot, 'package-lock.json');
+
     // 1. DynamoDB Table
     const usersTable = new dynamodb.Table(this, 'UsersTable', {
       tableName: 'StravaGcal-Users',
@@ -82,7 +85,9 @@ export class InfrastructureStack extends cdk.Stack {
       functionName: 'StravaGcal-ApiHandler',
       description: 'API Gateway handler for authentication, user management, and Strava webhooks',
       runtime: lambda.Runtime.NODEJS_24_X,
-      entry: path.join(__dirname, '../../src/app.js'),
+      projectRoot,
+      depsLockFilePath,
+      entry: path.join(projectRoot, 'src/app.js'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
@@ -338,7 +343,9 @@ export class InfrastructureStack extends cdk.Stack {
       functionName: 'StravaGcal-ActivityFetchWorker',
       description: 'Worker process that fetches historical and recent activities from Strava',
       runtime: lambda.Runtime.NODEJS_24_X,
-      entry: path.join(__dirname, '../../src/workers/fetch-worker.js'),
+      projectRoot,
+      depsLockFilePath,
+      entry: path.join(projectRoot, 'src/workers/fetch-worker.js'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(300),
       memorySize: 512,
@@ -378,7 +385,9 @@ export class InfrastructureStack extends cdk.Stack {
       functionName: 'StravaGcal-ActivitySyncWorker',
       description: 'Worker process that synchronizes fetched Strava activities to Google Calendar',
       runtime: lambda.Runtime.NODEJS_24_X,
-      entry: path.join(__dirname, '../../src/workers/sync-worker.js'),
+      projectRoot,
+      depsLockFilePath,
+      entry: path.join(projectRoot, 'src/workers/sync-worker.js'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
