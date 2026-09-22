@@ -28,40 +28,42 @@ test('AlertsTopic has an email subscription configured', () => {
   });
 });
 
-test('AppError metric filters and alarms are configured with FunctionName dimension', () => {
+test('AppError metric filters and alarms are configured per function', () => {
   const app = new cdk.App();
   const stack = new Infrastructure.InfrastructureStack(app, 'MyTestStackMetrics', {
     env: { account: '123456789012', region: 'us-east-2' },
   });
   const template = Template.fromStack(stack);
 
-  // Assert all 3 MetricFilters exist with FunctionName dimension
+  const expectedMetrics = [
+    'ApiHandler-AppErrors',
+    'ActivityFetchWorker-AppErrors',
+    'ActivitySyncWorker-AppErrors',
+  ];
+
+  // Assert all 3 MetricFilters exist with their per-function metric names
   const metricFilters = template.findResources('AWS::Logs::MetricFilter');
   const appErrorFilters = Object.values(metricFilters).filter(
-    (mf) => mf.Properties.MetricTransformations?.[0]?.MetricName === 'AppErrors'
+    (mf) => expectedMetrics.includes(mf.Properties.MetricTransformations?.[0]?.MetricName)
   );
   expect(appErrorFilters).toHaveLength(3);
+
   for (const filter of appErrorFilters) {
-    expect(filter.Properties.MetricTransformations[0].Dimensions).toEqual([
-      {
-        Key: 'FunctionName',
-        Value: expect.any(Object),
-      },
-    ]);
+    // Ensure no dimensions are set on the MetricTransformation (AWS requires valid log selectors)
+    expect(filter.Properties.MetricTransformations[0].Dimensions).toBeUndefined();
+    expect(filter.Properties.MetricTransformations[0].MetricNamespace).toBe('StravaGcal/Application');
+    expect(filter.Properties.MetricTransformations[0].MetricValue).toBe('1');
   }
 
-  // Assert all 3 Alarms exist for AppErrors with FunctionName dimension
+  // Assert all 3 Alarms exist for each function's AppError metric
   const alarms = template.findResources('AWS::CloudWatch::Alarm');
   const appErrorAlarms = Object.values(alarms).filter(
-    (alarm) => alarm.Properties.MetricName === 'AppErrors'
+    (alarm) => expectedMetrics.includes(alarm.Properties.MetricName)
   );
   expect(appErrorAlarms).toHaveLength(3);
-  for (const alarm of appErrorAlarms) {
-    expect(alarm.Properties.Dimensions).toEqual([
-      {
-        Name: 'FunctionName',
-        Value: expect.any(Object),
-      },
-    ]);
-  }
+
+  const alarmNames = appErrorAlarms.map((a) => a.Properties.AlarmName);
+  expect(alarmNames).toContain('StravaGcal-AppError-ApiHandler-Alarm');
+  expect(alarmNames).toContain('StravaGcal-AppError-ActivityFetchWorker-Alarm');
+  expect(alarmNames).toContain('StravaGcal-AppError-ActivitySyncWorker-Alarm');
 });

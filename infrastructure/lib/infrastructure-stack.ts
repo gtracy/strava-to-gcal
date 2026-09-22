@@ -301,7 +301,6 @@ export class InfrastructureStack extends cdk.Stack {
     syncAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
 
     // --- APP-LEVEL ERRORS CONFIGURATION ---
-    const appErrorMetricName = 'AppErrors';
     const appErrorMetricNamespace = 'StravaGcal/Application';
 
     // 4. Activity Fetch Queue and Worker
@@ -403,25 +402,23 @@ export class InfrastructureStack extends cdk.Stack {
     stravaSyncLambda.addEnvironment('SYNC_QUEUE_URL', activitySyncQueue.queueUrl);
     activityFetchQueue.grantSendMessages(stravaSyncLambda);
     stravaSyncLambda.addEnvironment('FETCH_QUEUE_URL', activityFetchQueue.queueUrl);
-    // Enable metric filters and alarms with FunctionName dimension on Log Groups
+    // Enable per-function metric filters and alarms on Log Groups
+    // Note: CloudWatch Logs MetricFilter dimensions only support dynamic JSON selectors from log payloads (e.g. $.field),
+    // not static strings or CloudFormation references. We therefore distinguish errors by metricName per function.
     const createAppErrorAlert = (lambdaFn: NodejsFunction, id: string, nameSuffix: string) => {
+      const metricName = `${nameSuffix}-AppErrors`;
+
       new logs.MetricFilter(this, id, {
         logGroup: lambdaFn.logGroup,
         metricNamespace: appErrorMetricNamespace,
-        metricName: appErrorMetricName,
+        metricName,
         filterPattern: logs.FilterPattern.stringValue('$.level', '=', '50'),
         metricValue: '1',
-        dimensions: {
-          FunctionName: lambdaFn.functionName,
-        },
       });
 
       const metric = new cloudwatch.Metric({
         namespace: appErrorMetricNamespace,
-        metricName: appErrorMetricName,
-        dimensionsMap: {
-          FunctionName: lambdaFn.functionName,
-        },
+        metricName,
         statistic: cloudwatch.Stats.SUM,
         period: cdk.Duration.minutes(5),
       });
