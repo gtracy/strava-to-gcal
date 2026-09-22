@@ -73,6 +73,11 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     // 2. Lambda Function
+    const stravaSyncLogGroup = new logs.LogGroup(this, 'StravaSyncLogGroup', {
+      retention: logs.RetentionDays.THREE_MONTHS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const stravaSyncLambda = new NodejsFunction(this, 'StravaSyncFunction', {
       functionName: 'StravaGcal-ApiHandler',
       description: 'API Gateway handler for authentication, user management, and Strava webhooks',
@@ -81,7 +86,7 @@ export class InfrastructureStack extends cdk.Stack {
       handler: 'handler',
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
-      logRetention: logs.RetentionDays.THREE_MONTHS,
+      logGroup: stravaSyncLogGroup,
       environment: {
         NODE_OPTIONS: '--no-deprecation',
         USERS_TABLE_NAME: usersTable.tableName,
@@ -319,6 +324,11 @@ export class InfrastructureStack extends cdk.Stack {
       }
     });
 
+    const activityFetchLogGroup = new logs.LogGroup(this, 'ActivityFetchLogGroup', {
+      retention: logs.RetentionDays.THREE_MONTHS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const activityFetchWorker = new NodejsFunction(this, 'ActivityFetchWorker', {
       functionName: 'StravaGcal-ActivityFetchWorker',
       description: 'Worker process that fetches historical and recent activities from Strava',
@@ -327,7 +337,7 @@ export class InfrastructureStack extends cdk.Stack {
       handler: 'handler',
       timeout: cdk.Duration.seconds(300),
       memorySize: 512,
-      logRetention: logs.RetentionDays.THREE_MONTHS,
+      logGroup: activityFetchLogGroup,
       environment: {
         NODE_OPTIONS: '--no-deprecation',
         USERS_TABLE_NAME: usersTable.tableName,
@@ -354,6 +364,11 @@ export class InfrastructureStack extends cdk.Stack {
       }
     });
 
+    const activitySyncLogGroup = new logs.LogGroup(this, 'ActivitySyncLogGroup', {
+      retention: logs.RetentionDays.THREE_MONTHS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const activitySyncWorker = new NodejsFunction(this, 'ActivitySyncWorker', {
       functionName: 'StravaGcal-ActivitySyncWorker',
       description: 'Worker process that synchronizes fetched Strava activities to Google Calendar',
@@ -362,7 +377,7 @@ export class InfrastructureStack extends cdk.Stack {
       handler: 'handler',
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
-      logRetention: logs.RetentionDays.THREE_MONTHS,
+      logGroup: activitySyncLogGroup,
       environment: {
         NODE_OPTIONS: '--no-deprecation',
         USERS_TABLE_NAME: usersTable.tableName,
@@ -395,7 +410,6 @@ export class InfrastructureStack extends cdk.Stack {
     activityFetchQueue.grantSendMessages(stravaSyncLambda);
     stravaSyncLambda.addEnvironment('FETCH_QUEUE_URL', activityFetchQueue.queueUrl);
     // Enable metric filters on Log Groups
-    // We have to specify the default CDK log group names since we used logRetention on the functions
     const attachMetricFilter = (lambdaFn: NodejsFunction, id: string) => {
       new logs.MetricFilter(this, id, {
         logGroup: lambdaFn.logGroup,
