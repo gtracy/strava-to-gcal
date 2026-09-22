@@ -70,15 +70,6 @@ The frontend (Vite + React) uses a layered testing approach:
 
    The API will be available at `http://localhost:3000`.
 
-### Webhooks Dev Script
-
-An interactive CLI script is provided to manage your Strava webhooks locally (list, create, delete, and test with mock data).
-Ensure your `env.json` is configured with your Strava credentials and `STRAVA_VERIFY_TOKEN`.
-```bash
-npm run webhook-setup
-```
-If creating a new webhook destination locally, you will need a publicly accessible URL via [ngrok](https://ngrok.com/): `ngrok http 3000`.
-
 ### Frontend Setup
 
 1.  **Configure Environment Variables**:
@@ -97,31 +88,131 @@ If creating a new webhook destination locally, you will need a publicly accessib
     ```
     The app will run at `http://localhost:5173`.
 
+## Operational & Developer CLI Scripts
+
+The repository includes dedicated CLI utilities in the `scripts/` directory for local development, webhook administration, Dead Letter Queue (DLQ) diagnostics, and user lifecycle management.
+
+### 1. Webhook Administration (`scripts/strava-webhooks.js`)
+An interactive CLI tool to manage Strava push subscriptions and trigger backfill syncs.
+
+```bash
+npm run webhook-setup
+```
+
+**Features:**
+- **View Subscriptions:** Inspect active webhook callback URLs and subscription IDs.
+- **Create Subscription:** Register a new webhook endpoint with Strava (requires a public HTTPS endpoint, e.g. via `ngrok http 3000`).
+- **Delete Subscription:** Clean up stale subscriptions.
+- **Test Backfill / Fetch:** Dispatch a test fetch message for a specific athlete ID and date range.
+
+---
+
+### 2. DLQ Diagnostics & Inspection (`scripts/analyze-dlq.js`)
+Safely inspects and correlates failed messages in the SQS Dead Letter Queues without losing or consuming them.
+
+> [!NOTE]
+> Messages read during inspection have their SQS visibility timeout immediately restored to `0`, leaving them intact for redriving.
+
+```bash
+# Interactive mode (prompts for queue selection)
+npm run dlq:analyze
+
+# Inspect the Activity Sync DLQ (default)
+node scripts/analyze-dlq.js --queue sync
+
+# Inspect the Activity Fetch DLQ
+node scripts/analyze-dlq.js --queue fetch
+
+# Custom AWS profile and region with output file
+node scripts/analyze-dlq.js --profile strava-gcal --region us-east-2 --save ./dlq-report.json
+
+# Run non-interactively without writing a JSON file to disk
+node scripts/analyze-dlq.js --queue sync --no-save
+```
+
+**Key Outputs:**
+- Aggregate message counts and percentage breakdown by Strava Athlete ID.
+- Impacted operation types (`create`, `update`, `delete`).
+- List of unique Strava activity IDs that failed.
+- Average retry counts prior to DLQ arrival.
+- Correlated athlete metadata from DynamoDB (`StravaGcal-Users` via `StravaAthleteIndex`): athlete name, email, Google user ID, selected calendar ID, and account connection status.
+
+---
+
+### 3. DLQ Redrive (`scripts/redrive-dlq.js`)
+Moves messages from a Dead Letter Queue back to its primary SQS queue for automated reprocessing once downstream issues are resolved.
+
+```bash
+npm run dlq:redrive
+```
+
+**Options:**
+- `1. ActivityFetchDLQ (StravaGcal-ActivityFetchDLQ)`: Redrives historical backfill jobs back to `StravaGcal-ActivityFetchQueue`.
+- `2. ActivitySyncDLQ (StravaGcal-ActivitySyncDLQ)`: Redrives failed calendar sync jobs back to `StravaGcal-ActivitySyncQueue`.
+
+---
+
+### 4. User Disconnect Simulator (`scripts/disconnect-user.js`)
+Simulates an athlete disconnecting from Clocking Sweat as if triggered from the web UI:
+1. Signs a JWT session token for the athlete's `googleUserId`.
+2. Calls `DELETE /user` with bearer authorization against the API (or directly via AWS SDK with `--direct`).
+3. Revokes Google Calendar OAuth refresh/access tokens with Google.
+4. Deauthorizes Strava OAuth access tokens with Strava.
+5. Permanently deletes the athlete's record from the DynamoDB `StravaGcal-Users` table.
+
+```bash
+# Interactive mode (prompts for Athlete ID, Email, or Google User ID)
+npm run user:disconnect
+
+# Disconnect by Strava Athlete ID
+node scripts/disconnect-user.js --athlete-id 19851637642
+
+# Disconnect by user Email address
+node scripts/disconnect-user.js --email athlete@example.com
+
+# Disconnect by Google User ID targeting local backend
+node scripts/disconnect-user.js --google-id 103948572910 --api-url http://localhost:3000
+
+# Direct mode (uses AWS SDK directly without HTTP API Gateway)
+node scripts/disconnect-user.js --athlete-id 19851637642 --direct --force
+```
+
+---
+
+### 5. Local Server (`scripts/local-server.js`)
+Runs a local Express API server simulating API Gateway and AWS Lambda routes for development.
+
+```bash
+# Run against real AWS DynamoDB and KMS (uses env.json credentials)
+npm run local
+
+# Run with an in-memory mock database (no AWS credentials required)
+npm run local:mock
+```
+
+---
+
 ## Deployment
 
 ### CI/CD Pipeline
-Deployments are automated via **GitHub Actions** and triggered when a release tag is pushed.
+Deployments are automated via **GitHub Actions** and use AWS OIDC authentication (`arn:aws:iam::529150585931:role/GitHubActions-CDKDeployRole`).
 
-**To deploy:**
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+**Triggers:**
+- Pushing a version tag: `git tag v1.2.0 && git push origin v1.2.0`
+- Manual dispatch from GitHub Actions UI or CLI: `gh workflow run deploy.yml --ref main`
 
-The pipeline will:
-1. Run the test suite
-2. Build the frontend
-3. Generate `env.json` from GitHub Secrets
-4. Deploy infrastructure and application via CDK
+**Pipeline Steps:**
+1. Run backend and frontend test suites.
+2. Generate `env.json` from repository secrets.
+3. Validate presence of all required secrets before deployment.
+4. Build production frontend assets.
+5. Assume deployment IAM role via OIDC and deploy CloudFormation infrastructure via CDK.
 
 ### Required GitHub Secrets
-Add these in your repo's **Settings → Secrets and variables → Actions**:
+Configure these in **Settings → Secrets and variables → Actions**:
 
 | Secret | Description |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | IAM access key with CDK deploy permissions |
-| `AWS_SECRET_ACCESS_KEY` | Corresponding IAM secret key |
-| `AWS_REGION` | AWS region (e.g., `us-east-2`) |
 | `STRAVA_CLIENT_ID` | Strava API application ID |
 | `STRAVA_CLIENT_SECRET` | Strava API client secret |
 | `STRAVA_REFRESH_TOKEN` | Strava refresh token |
@@ -129,7 +220,9 @@ Add these in your repo's **Settings → Secrets and variables → Actions**:
 | `GOOGLE_CLIENT_ID` | Google OAuth 2.0 client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 client secret |
 | `KMS_KEY_ID` | AWS KMS key ID for token encryption |
-| `ALERT_EMAIL` | Email for CloudWatch alarm notifications |
+| `ALERT_EMAIL` | Email for CloudWatch alarms and user support |
+| `RECAPTCHA_SECRET_KEY` | Secret key for Google reCAPTCHA v3 verification |
+| `AWS_REGION` | AWS region (e.g., `us-east-2`) |
 
 ## System Architecture
 ![Architecture Diagram](./docs/architecture.png)
