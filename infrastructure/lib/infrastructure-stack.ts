@@ -300,29 +300,9 @@ export class InfrastructureStack extends cdk.Stack {
     });
     syncAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
 
-    // --- APP-LEVEL ERRORS METRIC FILTER ---
+    // --- APP-LEVEL ERRORS CONFIGURATION ---
     const appErrorMetricName = 'AppErrors';
     const appErrorMetricNamespace = 'StravaGcal/Application';
-
-    const appErrorMetric = new cloudwatch.Metric({
-      namespace: appErrorMetricNamespace,
-      metricName: appErrorMetricName,
-      statistic: cloudwatch.Stats.SUM,
-      period: cdk.Duration.minutes(5),
-    });
-
-    // We will attach the metric filter to the log groups of all three Lambdas later
-    // once the workers are instantiated below.
-
-    const appErrorAlarm = new cloudwatch.Alarm(this, 'AppErrorAlarm', {
-      alarmName: 'StravaGcal-AppError-Alarm',
-      metric: appErrorMetric,
-      threshold: 1,
-      evaluationPeriods: 1,
-      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-    });
-    appErrorAlarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
 
     // 4. Activity Fetch Queue and Worker
     const activityFetchQueue = new sqs.Queue(this, 'ActivityFetchQueue', {
@@ -423,20 +403,46 @@ export class InfrastructureStack extends cdk.Stack {
     stravaSyncLambda.addEnvironment('SYNC_QUEUE_URL', activitySyncQueue.queueUrl);
     activityFetchQueue.grantSendMessages(stravaSyncLambda);
     stravaSyncLambda.addEnvironment('FETCH_QUEUE_URL', activityFetchQueue.queueUrl);
-    // Enable metric filters on Log Groups
-    const attachMetricFilter = (lambdaFn: NodejsFunction, id: string) => {
+    // Enable metric filters and alarms with FunctionName dimension on Log Groups
+    const createAppErrorAlert = (lambdaFn: NodejsFunction, id: string, nameSuffix: string) => {
       new logs.MetricFilter(this, id, {
         logGroup: lambdaFn.logGroup,
         metricNamespace: appErrorMetricNamespace,
         metricName: appErrorMetricName,
         filterPattern: logs.FilterPattern.stringValue('$.level', '=', '50'),
         metricValue: '1',
+        dimensions: {
+          FunctionName: lambdaFn.functionName,
+        },
       });
+
+      const metric = new cloudwatch.Metric({
+        namespace: appErrorMetricNamespace,
+        metricName: appErrorMetricName,
+        dimensionsMap: {
+          FunctionName: lambdaFn.functionName,
+        },
+        statistic: cloudwatch.Stats.SUM,
+        period: cdk.Duration.minutes(5),
+      });
+
+      const alarm = new cloudwatch.Alarm(this, `${id}Alarm`, {
+        alarmName: `StravaGcal-AppError-${nameSuffix}-Alarm`,
+        alarmDescription: `App-level errors (Pino Level 50) in ${lambdaFn.functionName}`,
+        metric,
+        threshold: 1,
+        evaluationPeriods: 1,
+        comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+      alarm.addAlarmAction(new cw_actions.SnsAction(alertsTopic));
+
+      return metric;
     };
 
-    attachMetricFilter(stravaSyncLambda, 'ApiHandlerErrorFilter');
-    attachMetricFilter(activityFetchWorker, 'FetchWorkerErrorFilter');
-    attachMetricFilter(activitySyncWorker, 'SyncWorkerErrorFilter');
+    const apiHandlerErrorMetric = createAppErrorAlert(stravaSyncLambda, 'ApiHandlerErrorFilter', 'ApiHandler');
+    const fetchWorkerErrorMetric = createAppErrorAlert(activityFetchWorker, 'FetchWorkerErrorFilter', 'ActivityFetchWorker');
+    const syncWorkerErrorMetric = createAppErrorAlert(activitySyncWorker, 'SyncWorkerErrorFilter', 'ActivitySyncWorker');
 
     // --- CLOUDWATCH DASHBOARD ---
     const dashboard = new cloudwatch.Dashboard(this, 'StravaGcalDashboard', {
@@ -459,7 +465,7 @@ export class InfrastructureStack extends cdk.Stack {
     dashboard.addWidgets(
       new cloudwatch.GraphWidget({
         title: 'Application Errors (Pino Level 50)',
-        left: [appErrorMetric],
+        left: [apiHandlerErrorMetric, fetchWorkerErrorMetric, syncWorkerErrorMetric],
         width: 12
       }),
       new cloudwatch.SingleValueWidget({
