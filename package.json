@@ -11,7 +11,8 @@
     "local:mock": "NODE_OPTIONS='--no-deprecation' node scripts/local-server.js --mock-db",
     "webhook-setup": "NODE_OPTIONS='--no-deprecation' node scripts/strava-webhooks.js",
     "dlq:redrive": "NODE_OPTIONS='--no-deprecation' node scripts/redrive-dlq.js",
-    "dlq:analyze": "NODE_OPTIONS='--no-deprecation' node scripts/analyze-dlq.js"
+    "dlq:analyze": "NODE_OPTIONS='--no-deprecation' node scripts/analyze-dlq.js",
+    "user:disconnect": "NODE_OPTIONS='--no-deprecation' node scripts/disconnect-user.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.980.0",
