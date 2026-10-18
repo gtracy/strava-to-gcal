@@ -3,11 +3,13 @@ const app = require('../src/app');
 const authService = require('../src/services/auth');
 const userRepository = require('../src/repositories/user-repository');
 const googleCalendarService = require('../src/services/googleCalendar');
+const queueService = require('../src/services/queue');
 const jwt = require('jsonwebtoken');
 
 jest.mock('../src/services/auth');
 jest.mock('../src/repositories/user-repository');
 jest.mock('../src/services/googleCalendar');
+jest.mock('../src/services/queue');
 
 describe('Auth Endpoints', () => {
     beforeEach(() => {
@@ -160,5 +162,78 @@ describe('Auth Endpoints', () => {
         expect(response.statusCode).toBe(403);
         const body = JSON.parse(response.body);
         expect(body.error).toBe('insufficient_calendar_permissions');
+    });
+
+    it('POST /auth/strava should connect Strava and trigger automatic lookback activity fetch', async () => {
+        const token = jwt.sign({ googleUserId: '12345' }, 'test-secret');
+        authService.exchangeStravaCode.mockResolvedValue({
+            access_token: 'strava_access_123',
+            refresh_token: 'strava_refresh_123',
+            athlete: {
+                id: 98765,
+                measurement_preference: 'meters',
+                country: 'United States'
+            }
+        });
+        const mockUser = {
+            googleUserId: '12345',
+            email: 'test@example.com'
+        };
+        userRepository.getUserByGoogleId.mockResolvedValue(mockUser);
+        userRepository.saveUser.mockResolvedValue();
+        queueService.enqueueActivityFetch.mockResolvedValue();
+
+        const event = {
+            routeKey: 'POST /auth/strava',
+            headers: {
+                authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ code: 'strava_code_123' })
+        };
+
+        const response = await app.handler(event);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).success).toBe(true);
+        expect(userRepository.saveUser).toHaveBeenCalledWith(expect.objectContaining({
+            stravaAthleteId: '98765',
+            stravaAccessToken: 'strava_access_123',
+            stravaRefreshToken: 'strava_refresh_123',
+            metricPreference: 'km'
+        }));
+        expect(queueService.enqueueActivityFetch).toHaveBeenCalledWith('98765', 30);
+    });
+
+    it('POST /auth/strava should succeed even if automatic lookback enqueueActivityFetch fails', async () => {
+        const token = jwt.sign({ googleUserId: '12345' }, 'test-secret');
+        authService.exchangeStravaCode.mockResolvedValue({
+            access_token: 'strava_access_123',
+            refresh_token: 'strava_refresh_123',
+            athlete: {
+                id: 98765,
+                measurement_preference: 'feet',
+                country: 'United States'
+            }
+        });
+        const mockUser = {
+            googleUserId: '12345',
+            email: 'test@example.com'
+        };
+        userRepository.getUserByGoogleId.mockResolvedValue(mockUser);
+        userRepository.saveUser.mockResolvedValue();
+        queueService.enqueueActivityFetch.mockRejectedValue(new Error('SQS send failed'));
+
+        const event = {
+            routeKey: 'POST /auth/strava',
+            headers: {
+                authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ code: 'strava_code_123' })
+        };
+
+        const response = await app.handler(event);
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body).success).toBe(true);
+        expect(userRepository.saveUser).toHaveBeenCalled();
+        expect(queueService.enqueueActivityFetch).toHaveBeenCalledWith('98765', 30);
     });
 });

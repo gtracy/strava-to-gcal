@@ -105,6 +105,7 @@ export class InfrastructureStack extends cdk.Stack {
         STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET || '',
         SUPPORT_EMAIL_RECIPIENT: process.env.ALERT_EMAIL || '',
         RECAPTCHA_SECRET_KEY: process.env.RECAPTCHA_SECRET_KEY || '',
+        INITIAL_LOOKBACK_DAYS: process.env.INITIAL_LOOKBACK_DAYS || '30',
       },
     });
 

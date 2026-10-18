@@ -187,6 +187,14 @@ exports.handler = async (event) => {
             await userRepository.saveUser(user);
             logger.info({ googleUserId: authorizedGoogleId, stravaId: user.stravaAthleteId }, 'User connected Strava');
 
+            const lookbackDays = parseInt(process.env.INITIAL_LOOKBACK_DAYS, 10) || 30;
+            try {
+                await queueService.enqueueActivityFetch(user.stravaAthleteId, lookbackDays);
+                logger.info({ googleUserId: authorizedGoogleId, stravaId: user.stravaAthleteId, days: lookbackDays }, 'Triggered automatic lookback activity fetch on Strava connect');
+            } catch (queueErr) {
+                logger.error({ errMessage: queueErr.message, googleUserId: authorizedGoogleId, stravaId: user.stravaAthleteId }, 'Failed to enqueue automatic lookback activity fetch');
+            }
+
             return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ success: true }) };
         }
 
