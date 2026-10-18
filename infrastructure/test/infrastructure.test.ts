@@ -2,7 +2,7 @@ import * as cdk from 'aws-cdk-lib/core';
 import { Template } from 'aws-cdk-lib/assertions';
 import * as Infrastructure from '../lib/infrastructure-stack';
 
-test('Lambda log groups are configured with 90-day retention', () => {
+test('Lambda log groups are configured with 90-day retention and canonical names', () => {
   const app = new cdk.App();
   const stack = new Infrastructure.InfrastructureStack(app, 'MyTestStack', {
     env: { account: '123456789012', region: 'us-east-2' },
@@ -13,6 +13,20 @@ test('Lambda log groups are configured with 90-day retention', () => {
   template.resourcePropertiesCountIs('AWS::Logs::LogGroup', {
     RetentionInDays: 90,
   }, 3);
+
+  // Assert canonical log group names
+  template.hasResourceProperties('AWS::Logs::LogGroup', {
+    LogGroupName: '/aws/lambda/StravaGcal-ApiHandler',
+    RetentionInDays: 90,
+  });
+  template.hasResourceProperties('AWS::Logs::LogGroup', {
+    LogGroupName: '/aws/lambda/StravaGcal-ActivityFetchWorker',
+    RetentionInDays: 90,
+  });
+  template.hasResourceProperties('AWS::Logs::LogGroup', {
+    LogGroupName: '/aws/lambda/StravaGcal-ActivitySyncWorker',
+    RetentionInDays: 90,
+  });
 });
 
 test('AlertsTopic has an email subscription configured', () => {

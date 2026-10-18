@@ -77,6 +77,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     // 2. Lambda Function
     const stravaSyncLogGroup = new logs.LogGroup(this, 'StravaSyncLogGroup', {
+      logGroupName: '/aws/lambda/StravaGcal-ApiHandler',
       retention: logs.RetentionDays.THREE_MONTHS,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -315,6 +316,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     const activityFetchLogGroup = new logs.LogGroup(this, 'ActivityFetchLogGroup', {
+      logGroupName: '/aws/lambda/StravaGcal-ActivityFetchWorker',
       retention: logs.RetentionDays.THREE_MONTHS,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -357,6 +359,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     const activitySyncLogGroup = new logs.LogGroup(this, 'ActivitySyncLogGroup', {
+      logGroupName: '/aws/lambda/StravaGcal-ActivitySyncWorker',
       retention: logs.RetentionDays.THREE_MONTHS,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
