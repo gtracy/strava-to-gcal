@@ -1,4 +1,4 @@
-const { parseArgs, classifyUser, sanitizeUser, scanAllUsers } = require('../scripts/list-users');
+const { parseArgs, classifyUser, sanitizeUser, formatTableRow, scanAllUsers } = require('../scripts/list-users');
 const { ScanCommand } = require('@aws-sdk/lib-dynamodb');
 
 describe('scripts/list-users.js', () => {
@@ -92,6 +92,36 @@ describe('scripts/list-users.js', () => {
                 lastSync: 'N/A',
                 googleUserId: 'g-456',
             });
+        });
+    });
+
+    describe('formatTableRow', () => {
+        it('should format table row without a Calendar column', () => {
+            const sanitized = {
+                athleteId: '12345',
+                name: 'John Smith',
+                email: 'john@example.com',
+                status: 'ACTIVE',
+                calendar: 'primary',
+                units: 'mi',
+                lastSync: '2026-10-18T08:00:00.000Z',
+                googleUserId: 'g-12345',
+            };
+
+            const row = formatTableRow(sanitized, 0);
+
+            expect(row).toEqual({
+                '#': 1,
+                'Athlete ID': '12345',
+                'Name': 'John Smith',
+                'Email': 'john@example.com',
+                'Status': 'ACTIVE',
+                'Units': 'mi',
+                'Last Sync': '2026-10-18T08:00:00.000Z',
+            });
+
+            expect(row).not.toHaveProperty('Calendar');
+            expect(row).not.toHaveProperty('calendar');
         });
     });
 

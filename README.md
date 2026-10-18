@@ -199,7 +199,7 @@ node scripts/list-users.js --profile strava-gcal --region us-east-2
 
 **Key Outputs:**
 - Aggregate summary counts: Total users, Active users, Pending Strava connection, and Disconnected.
-- Tabular display: Athlete ID, Name, Email, Status (`ACTIVE`, `PENDING_STRAVA`, `DISCONNECTED`), Selected Calendar, Units Preference (`mi` / `km`), and Last Sync timestamp.
+- Tabular display: Athlete ID, Name, Email, Status (`ACTIVE`, `PENDING_STRAVA`, `DISCONNECTED`), Units Preference (`mi` / `km`), and Last Sync timestamp.
 - Automatic token sanitization (sensitive OAuth tokens are never output).
 
 ---

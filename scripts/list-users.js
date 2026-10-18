@@ -174,16 +174,7 @@ async function main() {
             return;
         }
 
-        const tableData = displayedUsers.map((u, idx) => ({
-            '#': idx + 1,
-            'Athlete ID': u.athleteId,
-            'Name': u.name,
-            'Email': u.email,
-            'Status': u.status,
-            'Calendar': u.calendar,
-            'Units': u.units,
-            'Last Sync': u.lastSync
-        }));
+        const tableData = displayedUsers.map(formatTableRow);
 
         console.table(tableData);
         console.log('');
@@ -194,6 +185,18 @@ async function main() {
     }
 }
 
+function formatTableRow(u, idx) {
+    return {
+        '#': idx + 1,
+        'Athlete ID': u.athleteId,
+        'Name': u.name,
+        'Email': u.email,
+        'Status': u.status,
+        'Units': u.units,
+        'Last Sync': u.lastSync
+    };
+}
+
 // Allow importing helpers for testing
 if (require.main === module) {
     main();
@@ -202,6 +205,7 @@ if (require.main === module) {
         parseArgs,
         classifyUser,
         sanitizeUser,
+        formatTableRow,
         scanAllUsers,
     };
 }
