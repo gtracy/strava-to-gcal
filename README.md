@@ -179,7 +179,32 @@ node scripts/disconnect-user.js --athlete-id 19851637642 --direct --force
 
 ---
 
-### 5. Local Server (`scripts/local-server.js`)
+### 5. User Directory & Active Users List (`scripts/list-users.js`)
+Lists registered athletes in DynamoDB with their current connection status, metric preferences, and connected calendars.
+By default, displays only active users (accounts with both Strava and Google connected and not marked disconnected).
+
+```bash
+# List all active users (default)
+npm run users:list
+
+# Include pending and disconnected users
+node scripts/list-users.js --all
+
+# Output user directory as JSON
+node scripts/list-users.js --json
+
+# Query against custom AWS profile or region
+node scripts/list-users.js --profile strava-gcal --region us-east-2
+```
+
+**Key Outputs:**
+- Aggregate summary counts: Total users, Active users, Pending Strava connection, and Disconnected.
+- Tabular display: Athlete ID, Name, Email, Status (`ACTIVE`, `PENDING_STRAVA`, `DISCONNECTED`), Selected Calendar, Units Preference (`mi` / `km`), and Last Sync timestamp.
+- Automatic token sanitization (sensitive OAuth tokens are never output).
+
+---
+
+### 6. Local Server (`scripts/local-server.js`)
 Runs a local Express API server simulating API Gateway and AWS Lambda routes for development.
 
 ```bash
