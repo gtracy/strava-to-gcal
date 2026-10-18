@@ -28,6 +28,13 @@ exports.handler = async (event) => {
                 await deleteFlow.handleDelete(user, activityId);
             } else {
                 logger.warn({ aspectType }, 'Unknown aspect type in sync record');
+                continue;
+            }
+
+            try {
+                await userRepository.updateLastSyncTime(user.googleUserId);
+            } catch (syncErr) {
+                logger.warn({ errMessage: syncErr.message, googleUserId: user.googleUserId }, 'Failed to record lastSyncTime');
             }
 
         } catch (error) {

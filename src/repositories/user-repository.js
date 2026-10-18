@@ -1,5 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const pino = require('pino');
 const kms = require('../utils/kms');
 
@@ -124,7 +124,6 @@ class UserRepository {
             exprAttrValues[':empty'] = null;
         }
 
-        const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
         const params = {
             TableName: this.tableName,
             Key: { googleUserId },
@@ -138,6 +137,29 @@ class UserRepository {
             logger.info({ googleUserId, provider }, 'User marked as disconnected');
         } catch (error) {
             logger.error({ errMessage: error.message, googleUserId, provider }, 'Failed to mark user as disconnected');
+            throw error;
+        }
+    }
+
+    /**
+     * Update the lastSyncTime timestamp for a user.
+     */
+    async updateLastSyncTime(googleUserId, timestamp = new Date().toISOString()) {
+        const params = {
+            TableName: this.tableName,
+            Key: { googleUserId },
+            UpdateExpression: 'SET lastSyncTime = :now',
+            ExpressionAttributeValues: {
+                ':now': timestamp
+            }
+        };
+
+        try {
+            await this.docClient.send(new UpdateCommand(params));
+            logger.info({ googleUserId, lastSyncTime: timestamp }, 'User lastSyncTime updated');
+            return timestamp;
+        } catch (error) {
+            logger.error({ errMessage: error.message, googleUserId }, 'Failed to update lastSyncTime');
             throw error;
         }
     }

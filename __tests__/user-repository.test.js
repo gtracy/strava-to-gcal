@@ -71,4 +71,52 @@ describe('UserRepository - Disconnect Handling', () => {
         }));
         expect(mockSend).toHaveBeenCalledTimes(1);
     });
+
+    describe('updateLastSyncTime', () => {
+        it('should update lastSyncTime with given timestamp', async () => {
+            const googleUserId = 'user-123';
+            const timestamp = '2026-10-18T12:00:00.000Z';
+
+            mockSend.mockResolvedValueOnce({});
+
+            const result = await userRepository.updateLastSyncTime(googleUserId, timestamp);
+
+            expect(result).toBe(timestamp);
+            expect(UpdateCommand).toHaveBeenCalledWith({
+                TableName: process.env.USERS_TABLE_NAME,
+                Key: { googleUserId },
+                UpdateExpression: 'SET lastSyncTime = :now',
+                ExpressionAttributeValues: {
+                    ':now': timestamp
+                }
+            });
+            expect(mockSend).toHaveBeenCalledTimes(1);
+        });
+
+        it('should default to an ISO timestamp when none is passed', async () => {
+            const googleUserId = 'user-456';
+
+            mockSend.mockResolvedValueOnce({});
+
+            const result = await userRepository.updateLastSyncTime(googleUserId);
+
+            expect(typeof result).toBe('string');
+            expect(new Date(result).toISOString()).toBe(result);
+            expect(UpdateCommand).toHaveBeenCalledWith(expect.objectContaining({
+                TableName: process.env.USERS_TABLE_NAME,
+                Key: { googleUserId },
+                UpdateExpression: 'SET lastSyncTime = :now',
+                ExpressionAttributeValues: {
+                    ':now': result
+                }
+            }));
+            expect(mockSend).toHaveBeenCalledTimes(1);
+        });
+
+        it('should rethrow errors when DynamoDB update fails', async () => {
+            mockSend.mockRejectedValueOnce(new Error('DDB write error'));
+
+            await expect(userRepository.updateLastSyncTime('user-err')).rejects.toThrow('DDB write error');
+        });
+    });
 });
