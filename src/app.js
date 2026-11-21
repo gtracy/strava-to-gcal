@@ -20,6 +20,15 @@ const verifySession = async (headers) => {
     return jwt.verify(token, secret).googleUserId;
 };
 
+const parseJsonPreservingBigIds = (rawBody) => {
+    if (typeof rawBody !== 'string') return rawBody;
+    const safeJson = rawBody.replace(
+        /("(?:object_id|owner_id|userId|id)"\s*:\s*)(-?\d{16,})(?=\s*[,}\]])/g,
+        '$1"$2"'
+    );
+    return JSON.parse(safeJson);
+};
+
 const verifyRecaptcha = async (token) => {
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
     if (!secretKey) {
@@ -166,7 +175,7 @@ exports.handler = async (event) => {
 
             user.stravaAccessToken = stravaData.access_token;
             user.stravaRefreshToken = stravaData.refresh_token;
-            user.stravaAthleteId = String(stravaData.athlete.id);
+            user.stravaAthleteId = stravaData.athlete.id_str || String(stravaData.athlete.id);
 
             // Set a smart default for metric preference if not explicitly set already
             if (!user.metricPreference) {
@@ -432,10 +441,11 @@ exports.handler = async (event) => {
         }
         // POST /admin/sync-fetch
         if (routeKey === 'POST /admin/sync-fetch') {
-            const { userId, days } = JSON.parse(body);
+            const { userId, days } = parseJsonPreservingBigIds(body);
+            const normalizedUserId = userId !== undefined && userId !== null ? String(userId).trim() : '';
 
             // Basic validation
-            if (!userId || !days || isNaN(days) || days <= 0) {
+            if (!normalizedUserId || !days || isNaN(days) || days <= 0) {
                 return { statusCode: 400, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: 'Invalid userId or days' }) };
             }
             if (days > 60) {
@@ -443,13 +453,13 @@ exports.handler = async (event) => {
             }
 
             // Verify user exists and is connected to Strava
-            const user = await userRepository.getUserByStravaAthleteId(userId.toString());
+            const user = await userRepository.getUserByStravaAthleteId(normalizedUserId);
             if (!user) {
                 return { statusCode: 404, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: 'User not found for given Strava ID' }) };
             }
 
             // Enqueue the job
-            await queueService.enqueueActivityFetch(userId, days);
+            await queueService.enqueueActivityFetch(normalizedUserId, days);
 
             return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ success: true, message: `Enqueued fetch for last ${days} days` }) };
         }
@@ -524,10 +534,12 @@ exports.handler = async (event) => {
 
         // POST /webhook - Event ingestion
         if (routeKey === 'POST /webhook') {
-            const payload = JSON.parse(body);
+            const payload = parseJsonPreservingBigIds(body);
             logger.info({ payload }, 'Received webhook payload');
 
-            const { object_type, aspect_type, object_id, owner_id, updates } = payload;
+            const { object_type, aspect_type, updates } = payload;
+            const owner_id = payload.owner_id_str || (payload.owner_id !== undefined && payload.owner_id !== null ? String(payload.owner_id) : payload.owner_id);
+            const object_id = payload.object_id_str || (payload.object_id !== undefined && payload.object_id !== null ? String(payload.object_id) : payload.object_id);
 
             // 1. Find User
             const user = await userRepository.getUserByStravaAthleteId(owner_id);

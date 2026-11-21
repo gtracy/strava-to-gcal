@@ -49,7 +49,7 @@ exports.handler = async (event) => {
 
             if (activities.length > 0) {
                 const batch = activities.map(act => ({
-                    activityId: act.id.toString(),
+                    activityId: act.id_str || String(act.id),
                     aspectType: 'create' // treat backfill as 'create' event
                 }));
 
