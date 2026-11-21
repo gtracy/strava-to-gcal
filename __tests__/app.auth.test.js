@@ -236,4 +236,41 @@ describe('Auth Endpoints', () => {
         expect(userRepository.saveUser).toHaveBeenCalled();
         expect(queueService.enqueueActivityFetch).toHaveBeenCalledWith('98765', 30);
     });
+
+    it('POST /auth/strava should prefer athlete.id_str to preserve 64-bit athlete IDs', async () => {
+        const token = jwt.sign({ googleUserId: '12345' }, 'test-secret');
+        authService.exchangeStravaCode.mockResolvedValue({
+            access_token: 'strava_access_64',
+            refresh_token: 'strava_refresh_64',
+            athlete: {
+                // 9007199254740993 exceeds Number.MAX_SAFE_INTEGER and rounds to 9007199254740992 as a JS Number
+                id: 9007199254740992,
+                id_str: '9007199254740993',
+                measurement_preference: 'meters',
+                country: 'United States'
+            }
+        });
+        const mockUser = {
+            googleUserId: '12345',
+            email: 'test@example.com'
+        };
+        userRepository.getUserByGoogleId.mockResolvedValue(mockUser);
+        userRepository.saveUser.mockResolvedValue();
+        queueService.enqueueActivityFetch.mockResolvedValue();
+
+        const event = {
+            routeKey: 'POST /auth/strava',
+            headers: {
+                authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ code: 'strava_code_64' })
+        };
+
+        const response = await app.handler(event);
+        expect(response.statusCode).toBe(200);
+        expect(userRepository.saveUser).toHaveBeenCalledWith(expect.objectContaining({
+            stravaAthleteId: '9007199254740993'
+        }));
+        expect(queueService.enqueueActivityFetch).toHaveBeenCalledWith('9007199254740993', 30);
+    });
 });

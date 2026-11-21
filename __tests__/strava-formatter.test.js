@@ -139,6 +139,18 @@ describe('strava-formatter utilities', () => {
             expect(descMi).toContain('Average Speed: 8:03 /mi');
             expect(descMi).not.toContain('5:00');
         });
+
+        it('should prefer id_str over id when constructing the Strava activity URL for 64-bit activity IDs', () => {
+            const activity = {
+                id: 9007199254740992,
+                id_str: '9007199254740993',
+                type: 'Run',
+                name: '64-Bit Morning Run'
+            };
+
+            const desc = buildEventDescription(activity);
+            expect(desc).toContain('View on Strava: https://strava.com/activities/9007199254740993');
+        });
     });
 
     describe('buildEventLocation', () => {

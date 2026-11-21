@@ -49,7 +49,8 @@ function buildEventDescription(activity, pref = null) {
     const lines = [];
 
     // Header
-    lines.push(`View on Strava: https://strava.com/activities/${activity.id}`);
+    const activityId = activity.id_str || activity.id;
+    lines.push(`View on Strava: https://strava.com/activities/${activityId}`);
     if (activity.description) {
         lines.push(`\nNote: ${activity.description}`);
     }

@@ -111,20 +111,23 @@ async function deleteSubscription() {
 }
 
 async function testWebhook() {
-    const ownerId = await askQuestion("Enter Strava Athlete ID (owner_id) to mock [default: 12345]: ") || '12345';
+    const ownerIdInput = await askQuestion("Enter Strava Athlete ID (owner_id) to mock [default: 12345]: ") || '12345';
+    const ownerId = ownerIdInput.trim() || '12345';
     const aspectType = await askQuestion("Enter aspect_type (create, update, delete) [default: create]: ") || 'create';
 
     const defaultObjectId = Math.floor(Math.random() * 10000000000).toString();
     const objectIdInput = await askQuestion(`Enter Strava Activity ID (object_id) to mock [default: ${defaultObjectId}]: `) || defaultObjectId;
-    const objectId = parseInt(objectIdInput, 10) || parseInt(defaultObjectId, 10);
+    const objectId = objectIdInput.trim() || defaultObjectId;
 
     // Simulate event payload
     const payload = {
         object_type: "activity",
         object_id: objectId,
+        object_id_str: objectId,
         aspect_type: aspectType,
         updates: aspectType === 'update' ? { title: "Mock Update" } : {},
-        owner_id: parseInt(ownerId, 10),
+        owner_id: ownerId,
+        owner_id_str: ownerId,
         subscription_id: 999999,
         event_time: Math.floor(Date.now() / 1000)
     };
@@ -142,7 +145,7 @@ async function testWebhook() {
 
 async function testHistoricalSync() {
     const userIdInput = await askQuestion("Enter Strava Athlete ID to backfill [default: 12345]: ") || '12345';
-    const userId = parseInt(userIdInput, 10) || parseInt('12345', 10);
+    const userId = userIdInput.trim() || '12345';
 
     let daysInput = await askQuestion("Enter number of days back to sync (max 60) [default: 30]: ") || '30';
     let days = parseInt(daysInput, 10) || 30;
